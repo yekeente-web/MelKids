@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAnalytics, isSupported } from "firebase/analytics";
+import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
 // Configuração fornecida pelo usuário
 const firebaseConfig = {
@@ -21,19 +21,21 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Inicialização segura do Analytics (evita erro com AdBlock)
-export const analytics = typeof window !== 'undefined' ? await (async () => {
-  try {
-    const supported = await isSupported();
+// Inicialização segura do Analytics (evita erro com AdBlock e erro de build top-level await)
+let analytics: Analytics | null = null;
+
+if (typeof window !== 'undefined') {
+  // Executa a verificação sem bloquear o módulo (sem top-level await)
+  isSupported().then(supported => {
     if (supported) {
-      return getAnalytics(app);
+      analytics = getAnalytics(app);
     }
-    return null;
-  } catch (e) {
+  }).catch(e => {
     console.warn("Analytics blocked or not supported:", e);
-    return null;
-  }
-})() : null;
+  });
+}
+
+export { analytics };
 
 // Informa ao sistema que está tudo configurado
 export const isConfigured = true;
