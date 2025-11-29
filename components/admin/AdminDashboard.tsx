@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle, FileInput, Image as ImageIcon, Database } from 'lucide-react';
+import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle, FileInput } from 'lucide-react';
 import { Product, Order, StoreConfig } from '../../types';
 import { dataService } from '../../services/dataService';
 import { getConfigStatus } from '../../services/firebase';
@@ -20,16 +20,12 @@ export const AdminDashboard: React.FC = () => {
   const [config, setConfig] = useState<StoreConfig>({
       storeName: '',
       logoUrl: '',
-      whatsappNumber: '',
-      heroTitle: '',
-      heroSubtitle: ''
+      whatsappNumber: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   
   // Upload State
   const [isUploading, setIsUploading] = useState(false);
-  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
-  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Editing State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -77,102 +73,54 @@ export const AdminDashboard: React.FC = () => {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct && editingProduct.name) {
-      setIsSavingProduct(true);
-      try {
-        await dataService.saveProduct(editingProduct as Product);
-        await fetchData(); 
-        setEditingProduct(null);
-      } catch (error: any) {
-        alert("Erro ao salvar: " + error.message);
-      } finally {
-        setIsSavingProduct(false);
-      }
+      await dataService.saveProduct(editingProduct as Product);
+      await fetchData(); 
+      setEditingProduct(null);
     }
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && editingProduct) {
-        // Validation Size
-        if (file.size > 5 * 1024 * 1024) {
-            alert("A imagem é muito grande! Máximo 5MB.");
-            return;
-        }
-
         setIsUploading(true);
         try {
-            const url = await dataService.uploadImage(file, 'products');
+            const url = await dataService.uploadImage(file);
             setEditingProduct({ ...editingProduct, image: url });
         } catch (error: any) {
-            alert(error.message || 'Erro ao enviar imagem. Verifique se as chaves do Firebase estão corretas e se o Login Anônimo está ativo.');
+            alert(error.message || 'Erro ao enviar imagem.');
+            console.error(error);
         } finally {
             setIsUploading(false);
         }
     }
   };
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (file) {
-          if (file.size > 5 * 1024 * 1024) {
-              alert("A imagem é muito grande! Máximo 5MB.");
-              return;
-          }
-
-          setIsUploadingLogo(true);
-          try {
-              const url = await dataService.uploadImage(file, 'logos');
-              setConfig({ ...config, logoUrl: url });
-          } catch (error: any) {
-              alert("Erro ao enviar logo: " + error.message);
-          } finally {
-              setIsUploadingLogo(false);
-          }
-      }
-  };
-
   const handleDeleteProduct = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir este produto?')) {
-      try {
-        await dataService.deleteProduct(id);
-        await fetchData();
-      } catch (error: any) {
-        alert("Erro ao excluir: " + error.message);
-      }
+      await dataService.deleteProduct(id);
+      await fetchData();
     }
   };
 
   const handleSaveConfig = async () => {
-    try {
-      await dataService.saveConfig(config);
-      alert('Configurações salvas!');
-    } catch (error: any) {
-      alert("Erro ao salvar configurações: " + error.message);
-    }
+    await dataService.saveConfig(config);
+    alert('Configurações salvas!');
   };
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
-    try {
-      const updated = [...categories, newCategoryName.trim()];
-      await dataService.saveCategories(updated);
-      setCategories(updated);
-      setNewCategoryName('');
-    } catch (error: any) {
-      alert("Erro ao adicionar categoria: " + error.message);
-    }
+    const updated = [...categories, newCategoryName.trim()];
+    await dataService.saveCategories(updated);
+    setCategories(updated);
+    setNewCategoryName('');
   };
 
   const handleDeleteCategory = async (cat: string) => {
     if (confirm(`Remover categoria "${cat}"?`)) {
-        try {
-          const updated = categories.filter(c => c !== cat);
-          await dataService.saveCategories(updated);
-          setCategories(updated);
-        } catch (error: any) {
-          alert("Erro ao remover: " + error.message);
-        }
+        const updated = categories.filter(c => c !== cat);
+        await dataService.saveCategories(updated);
+        setCategories(updated);
     }
   };
 
@@ -194,23 +142,8 @@ export const AdminDashboard: React.FC = () => {
       }
   };
 
-  const handleSeedData = async () => {
-      if (confirm("Isso vai adicionar os produtos de exemplo e categorias padrão ao banco de dados. Deseja continuar?")) {
-          setIsLoading(true);
-          try {
-              await dataService.seedInitialData();
-              alert("Loja populada com sucesso!");
-              await fetchData();
-          } catch (error: any) {
-              alert("Erro ao popular loja: " + error.message);
-          } finally {
-              setIsLoading(false);
-          }
-      }
-  };
-
   // ------------------------------------------------------------------
-  // CONFIG SETUP WIZARD
+  // CONFIG SETUP WIZARD (If keys missing)
   // ------------------------------------------------------------------
   if (isAuthenticated && !configStatus.isConfigured) {
       return (
@@ -223,7 +156,9 @@ export const AdminDashboard: React.FC = () => {
                   
                   <p className="text-gray-600 mb-6 leading-relaxed">
                       Para que o Painel Admin funcione e salve os dados de verdade, você precisa conectar o <b>Google Firebase</b>.
+                      Atualmente, as seguintes chaves não foram encontradas na Vercel:
                   </p>
+
                   <div className="bg-gray-100 p-4 rounded-xl mb-6 font-mono text-xs overflow-x-auto">
                       {configStatus.envVars.map((v, i) => (
                           <div key={i} className={`flex justify-between py-1 border-b border-gray-200 last:border-0 ${!v.val ? 'text-red-500 font-bold' : 'text-green-600'}`}>
@@ -232,6 +167,16 @@ export const AdminDashboard: React.FC = () => {
                           </div>
                       ))}
                   </div>
+
+                  <h3 className="font-bold text-gray-800 mb-3">Como resolver:</h3>
+                  <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-600 mb-8">
+                      <li>Acesse o <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 hover:underline inline-flex items-center gap-1">Console do Firebase <ExternalLink size={12}/></a>.</li>
+                      <li>Crie um projeto novo chamado <b>MelKids</b>.</li>
+                      <li>Adicione um app Web (ícone <code>&lt;/&gt;</code>) para pegar as chaves.</li>
+                      <li>Ative o <b>Firestore Database</b> e o <b>Storage</b> no modo de teste.</li>
+                      <li>Vá no painel da Vercel &gt; Settings &gt; Environment Variables e adicione as chaves que estão faltando acima.</li>
+                  </ol>
+
                   <button onClick={() => window.location.reload()} className="w-full bg-mel-blue text-white font-bold py-3 rounded-xl hover:bg-blue-800 transition">
                       Já adicionei, recarregar página
                   </button>
@@ -295,19 +240,34 @@ export const AdminDashboard: React.FC = () => {
       <div className="flex flex-1 container mx-auto px-4 py-8 gap-8 flex-col md:flex-row">
         {/* Sidebar */}
         <aside className="w-full md:w-64 flex-shrink-0 space-y-2">
-            <button onClick={() => setActiveTab('products')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'products' ? 'bg-mel-blue text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+            <button 
+                onClick={() => setActiveTab('products')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'products' ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/20' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            >
                 <Package size={20} /> Produtos
             </button>
-            <button onClick={() => setActiveTab('categories')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'categories' ? 'bg-mel-blue text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+            <button 
+                onClick={() => setActiveTab('categories')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'categories' ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/20' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            >
                 <List size={20} /> Categorias
             </button>
-            <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'orders' ? 'bg-mel-blue text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+            <button 
+                onClick={() => setActiveTab('orders')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'orders' ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/20' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            >
                 <ShoppingBag size={20} /> Pedidos <span className="ml-auto bg-white/20 text-xs px-2 py-0.5 rounded-full">{orders.length}</span>
             </button>
-            <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'settings' ? 'bg-mel-blue text-white shadow-lg' : 'bg-white text-gray-600 hover:bg-gray-100'}`}>
+            <button 
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'settings' ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/20' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            >
                 <Settings size={20} /> Configurações
             </button>
-             <button onClick={() => window.location.href = '/'} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-8">
+             <button 
+                onClick={() => window.location.href = '/'}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-500 hover:bg-red-50 mt-8"
+            >
                 <LogOut size={20} /> Sair
             </button>
         </aside>
@@ -321,10 +281,16 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h2 className="text-2xl font-bold text-gray-800">Gerenciar Produtos</h2>
                         <div className="flex gap-2">
-                            <button onClick={() => setIsBulkModalOpen(true)} className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                            <button 
+                                onClick={() => setIsBulkModalOpen(true)}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                            >
                                 <FileInput size={20} /> Importar em Massa
                             </button>
-                            <button onClick={() => setEditingProduct({ id: 0, name: '', price: 0, category: categories[0] || 'Roupas', description: '', image: '', isNew: true, soldOut: false })} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                            <button 
+                                onClick={() => setEditingProduct({ id: 0, name: '', price: 0, category: categories[0] || 'Roupas', description: '', image: '', isNew: true, soldOut: false })}
+                                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                            >
                                 <Plus size={20} /> Novo Produto
                             </button>
                         </div>
@@ -347,13 +313,21 @@ export const AdminDashboard: React.FC = () => {
     "category": "Roupas",
     "description": "Descrição do produto...",
     "image": "https://link-da-imagem.com/foto.jpg"
-  }
+  },
+  { ... }
 ]`}
                                 </pre>
-                                <textarea className="flex-1 p-4 border rounded-xl bg-gray-50 font-mono text-sm mb-4 h-64" placeholder="Cole seu JSON aqui..." value={bulkJson} onChange={e => setBulkJson(e.target.value)}/>
+                                <textarea 
+                                    className="flex-1 p-4 border rounded-xl bg-gray-50 font-mono text-sm mb-4 h-64"
+                                    placeholder="Cole seu JSON aqui..."
+                                    value={bulkJson}
+                                    onChange={e => setBulkJson(e.target.value)}
+                                />
                                 <div className="flex justify-end gap-3">
                                     <button onClick={() => setIsBulkModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
-                                    <button onClick={handleBulkImport} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700">Importar Produtos</button>
+                                    <button onClick={handleBulkImport} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700">
+                                        Importar Produtos
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -388,23 +362,49 @@ export const AdminDashboard: React.FC = () => {
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Imagem do Produto</label>
                                             <div className="flex flex-col gap-2">
+                                                {/* Image Preview */}
                                                 {editingProduct.image && (
                                                     <div className="relative w-full h-32 bg-gray-100 rounded-lg overflow-hidden border">
                                                         <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
-                                                        <button type="button" onClick={() => setEditingProduct({...editingProduct, image: ''})} className="absolute top-1 right-1 bg-white rounded-full p-1 text-red-500 shadow-sm"><Trash2 size={16} /></button>
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setEditingProduct({...editingProduct, image: ''})}
+                                                            className="absolute top-1 right-1 bg-white rounded-full p-1 text-red-500 shadow-sm"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </div>
                                                 )}
+                                                
+                                                {/* Upload Button */}
                                                 {!editingProduct.image && (
-                                                    <label className={`w-full h-32 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition ${isUploading ? 'bg-gray-100 border-gray-300' : 'border-mel-blue/30 hover:bg-mel-blue/5'}`}>
+                                                    <label className={`
+                                                        w-full h-32 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition
+                                                        ${isUploading ? 'bg-gray-100 border-gray-300' : 'border-mel-blue/30 hover:bg-mel-blue/5'}
+                                                    `}>
                                                         {isUploading ? (
-                                                            <div className="flex flex-col items-center"><div className="w-8 h-8 border-4 border-mel-blue border-t-transparent rounded-full animate-spin mb-2"></div><span className="text-xs text-gray-500">Enviando...</span></div>
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-8 h-8 border-4 border-mel-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                                                                <span className="text-xs text-gray-500">Enviando...</span>
+                                                            </div>
                                                         ) : (
-                                                            <><UploadCloud className="text-mel-blue mb-2" size={32} /><span className="text-sm font-bold text-gray-600">Clique para enviar foto</span><span className="text-xs text-gray-400 mt-1">PNG, JPG (Máx 5MB)</span></>
+                                                            <>
+                                                                <UploadCloud className="text-mel-blue mb-2" size={32} />
+                                                                <span className="text-sm font-bold text-gray-600">Clique para enviar foto</span>
+                                                                <span className="text-xs text-gray-400 mt-1">PNG, JPG</span>
+                                                            </>
                                                         )}
                                                         <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
                                                     </label>
                                                 )}
-                                                <input className="w-full p-2 text-xs border rounded bg-gray-50 text-gray-400" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="Ou cole o link da imagem aqui..." />
+                                                
+                                                {/* Manual URL fallback */}
+                                                <input 
+                                                    className="w-full p-2 text-xs border rounded bg-gray-50 text-gray-400" 
+                                                    value={editingProduct.image || ''} 
+                                                    onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} 
+                                                    placeholder="Ou cole o link da imagem aqui..." 
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -427,8 +427,8 @@ export const AdminDashboard: React.FC = () => {
 
                                     <div className="flex justify-end gap-3 pt-4 border-t">
                                         <button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
-                                        <button type="submit" disabled={isUploading || isSavingProduct} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                                            {isSavingProduct ? 'Salvando...' : (isUploading ? 'Aguarde...' : 'Salvar Produto')}
+                                        <button type="submit" disabled={isUploading} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                            {isUploading ? 'Aguarde...' : 'Salvar Produto'}
                                         </button>
                                     </div>
                                 </form>
@@ -463,7 +463,11 @@ export const AdminDashboard: React.FC = () => {
                                         </td>
                                         <td className="py-3 font-bold text-gray-600">{p.price.toLocaleString('pt-AO')} Kz</td>
                                         <td className="py-3">
-                                            {p.soldOut ? <span className="text-red-500 text-xs font-bold uppercase border border-red-200 bg-red-50 px-2 py-1 rounded">Esgotado</span> : <span className="text-green-500 text-xs font-bold uppercase border border-green-200 bg-green-50 px-2 py-1 rounded">Em Estoque</span>}
+                                            {p.soldOut ? (
+                                                <span className="text-red-500 text-xs font-bold uppercase border border-red-200 bg-red-50 px-2 py-1 rounded">Esgotado</span>
+                                            ) : (
+                                                <span className="text-green-500 text-xs font-bold uppercase border border-green-200 bg-green-50 px-2 py-1 rounded">Em Estoque</span>
+                                            )}
                                         </td>
                                         <td className="py-3 text-right">
                                             <div className="flex justify-end gap-2">
@@ -483,15 +487,33 @@ export const AdminDashboard: React.FC = () => {
              {activeTab === 'categories' && (
                 <div className="space-y-6 max-w-xl">
                     <h2 className="text-2xl font-bold text-gray-800">Gerenciar Categorias</h2>
+                    
                     <form onSubmit={handleAddCategory} className="flex gap-2">
-                        <input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} placeholder="Nova Categoria..." className="flex-1 p-3 border rounded-xl" />
-                        <button type="submit" disabled={!newCategoryName.trim()} className="bg-mel-blue text-white px-6 rounded-xl font-bold hover:bg-blue-800 disabled:opacity-50">Adicionar</button>
+                        <input 
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            placeholder="Nova Categoria..."
+                            className="flex-1 p-3 border rounded-xl"
+                        />
+                        <button 
+                            type="submit"
+                            disabled={!newCategoryName.trim()}
+                            className="bg-mel-blue text-white px-6 rounded-xl font-bold hover:bg-blue-800 disabled:opacity-50"
+                        >
+                            Adicionar
+                        </button>
                     </form>
+
                     <div className="space-y-2">
                         {categories.map(cat => (
                             <div key={cat} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
                                 <span className="font-bold text-gray-700">{cat}</span>
-                                <button onClick={() => handleDeleteCategory(cat)} className="text-red-400 hover:text-red-600 p-2 hover:bg-white rounded-lg transition"><Trash2 size={18} /></button>
+                                <button 
+                                    onClick={() => handleDeleteCategory(cat)}
+                                    className="text-red-400 hover:text-red-600 p-2 hover:bg-white rounded-lg transition"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -503,122 +525,80 @@ export const AdminDashboard: React.FC = () => {
                  <div className="space-y-6">
                     <h2 className="text-2xl font-bold text-gray-800">Histórico de Pedidos</h2>
                     <div className="space-y-4">
-                        {orders.length === 0 ? <p className="text-gray-400">Nenhum pedido registrado ainda.</p> : orders.map(order => (
-                            <div key={order.id} className="border rounded-xl p-4 hover:shadow-md transition">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h3 className="font-bold text-lg">{order.customer.name}</h3>
-                                        <p className="text-sm text-gray-500">{order.customer.phone} • {order.customer.address}</p>
+                        {orders.length === 0 ? (
+                            <p className="text-gray-400">Nenhum pedido registrado ainda.</p>
+                        ) : (
+                            orders.map(order => (
+                                <div key={order.id} className="border rounded-xl p-4 hover:shadow-md transition">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="font-bold text-lg">{order.customer.name}</h3>
+                                            <p className="text-sm text-gray-500">{order.customer.phone} • {order.customer.address}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="block font-bold text-mel-blue">{order.total.toLocaleString('pt-AO')} Kz</span>
+                                            <span className="text-xs text-gray-400">{new Date(order.date).toLocaleDateString()}</span>
+                                        </div>
                                     </div>
-                                    <div className="text-right">
-                                        <span className="block font-bold text-mel-blue">{order.total.toLocaleString('pt-AO')} Kz</span>
-                                        <span className="text-xs text-gray-400">{new Date(order.date).toLocaleDateString()}</span>
+                                    <div className="bg-gray-50 p-3 rounded-lg text-sm space-y-1">
+                                        {order.items.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between text-gray-600">
+                                                <span>{item.quantity}x {item.name}</span>
+                                                <span>{(item.price * item.quantity).toLocaleString('pt-AO')} Kz</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 p-3 rounded-lg text-sm space-y-1">
-                                    {order.items.map((item, idx) => (
-                                        <div key={idx} className="flex justify-between text-gray-600"><span>{item.quantity}x {item.name}</span><span>{(item.price * item.quantity).toLocaleString('pt-AO')} Kz</span></div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                     </div>
                  </div>
             )}
 
             {/* SETTINGS TAB */}
             {activeTab === 'settings' && (
-                <div className="space-y-8 max-w-2xl">
-                    {/* General Settings */}
-                    <div className="space-y-6">
-                        <h2 className="text-2xl font-bold text-gray-800">Dados da Loja</h2>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">Nome da Loja</label>
-                                <input value={config.storeName} onChange={e => setConfig({...config, storeName: e.target.value})} className="w-full p-3 border rounded-xl" />
-                            </div>
-                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-1">WhatsApp (ex: 244932...)</label>
-                                <input value={config.whatsappNumber} onChange={e => setConfig({...config, whatsappNumber: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="244932853435" />
-                            </div>
-                        </div>
-
-                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Logotipo da Loja</label>
-                            
-                            {/* Logo Upload UI */}
-                            <div className="flex items-start gap-4 mb-2">
-                                {config.logoUrl ? (
-                                    <div className="relative w-24 h-24 bg-white border rounded-xl p-2">
-                                        <img src={config.logoUrl} className="w-full h-full object-contain" />
-                                        <button onClick={() => setConfig({...config, logoUrl: ''})} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><XCircle size={16}/></button>
-                                    </div>
-                                ) : (
-                                    <div className="w-24 h-24 bg-gray-100 rounded-xl flex items-center justify-center text-gray-400 border-2 border-dashed">
-                                        <ImageIcon size={24} />
-                                    </div>
-                                )}
-                                
-                                <div className="flex-1">
-                                    <label className={`block w-full border-2 border-dashed border-mel-blue/30 rounded-xl p-4 text-center cursor-pointer hover:bg-mel-blue/5 transition ${isUploadingLogo ? 'opacity-50 pointer-events-none' : ''}`}>
-                                        {isUploadingLogo ? (
-                                            <span className="text-sm font-bold text-mel-blue animate-pulse">Enviando...</span>
-                                        ) : (
-                                            <>
-                                                <UploadCloud className="mx-auto text-mel-blue mb-1" size={24} />
-                                                <span className="text-sm font-bold text-gray-600 block">Clique para enviar novo logo</span>
-                                                <span className="text-xs text-gray-400">Max 5MB (PNG/JPG)</span>
-                                            </>
-                                        )}
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleLogoUpload} disabled={isUploadingLogo} />
-                                    </label>
-                                    <div className="mt-2 text-center text-gray-400 text-xs font-bold">OU</div>
-                                    <input 
-                                        className="w-full mt-2 p-2 text-sm border rounded-lg bg-gray-50"
-                                        placeholder="Cole o link da imagem (URL)"
-                                        value={config.logoUrl}
-                                        onChange={e => setConfig({...config, logoUrl: e.target.value})}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="h-px bg-gray-200"></div>
-
-                    {/* Hero Settings */}
-                    <div className="space-y-6">
-                        <h2 className="text-2xl font-bold text-gray-800">Personalizar Página Inicial</h2>
+                <div className="space-y-6 max-w-xl">
+                    <h2 className="text-2xl font-bold text-gray-800">Configurações da Loja</h2>
+                    
+                    <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Título Principal (Hero)</label>
-                            <input value={config.heroTitle || ''} onChange={e => setConfig({...config, heroTitle: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="Ex: MelKids Angola" />
-                            <p className="text-xs text-gray-400 mt-1">Dica: Use quebras de linha no texto se necessário.</p>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Nome da Loja</label>
+                            <input 
+                                value={config.storeName}
+                                onChange={e => setConfig({...config, storeName: e.target.value})}
+                                className="w-full p-3 border rounded-xl"
+                            />
                         </div>
                          <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Subtítulo (Texto de Apoio)</label>
-                            <textarea value={config.heroSubtitle || ''} onChange={e => setConfig({...config, heroSubtitle: e.target.value})} className="w-full p-3 border rounded-xl h-24" placeholder="Ex: Descubra roupas incríveis..." />
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Número do WhatsApp (com código do país, sem +)</label>
+                            <input 
+                                value={config.whatsappNumber}
+                                onChange={e => setConfig({...config, whatsappNumber: e.target.value})}
+                                className="w-full p-3 border rounded-xl"
+                                placeholder="244932853435"
+                            />
                         </div>
-                    </div>
-
-                    <button onClick={handleSaveConfig} className="w-full bg-mel-blue text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-800 transition flex items-center justify-center gap-2">
-                        <Save size={20} /> Salvar Alterações
-                    </button>
-
-                    <div className="h-px bg-gray-200"></div>
-
-                    {/* Advanced Actions */}
-                    <div className="space-y-4 pt-4">
-                        <h3 className="text-lg font-bold text-gray-800">Ações Avançadas</h3>
-                        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center justify-between">
-                            <div>
-                                <h4 className="font-bold text-orange-800">Banco de Dados Vazio?</h4>
-                                <p className="text-sm text-orange-700">Restaure os produtos de exemplo para começar.</p>
-                            </div>
-                            <button onClick={handleSeedData} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm">
-                                <Database size={16} /> Restaurar Produtos Padrão
-                            </button>
+                         <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">URL do Logotipo</label>
+                            <input 
+                                value={config.logoUrl}
+                                onChange={e => setConfig({...config, logoUrl: e.target.value})}
+                                className="w-full p-3 border rounded-xl"
+                            />
+                            {config.logoUrl && (
+                                <div className="mt-4 p-4 border rounded-xl bg-gray-50 text-center">
+                                    <p className="text-xs text-gray-400 mb-2">Pré-visualização</p>
+                                    <img src={config.logoUrl} className="h-16 mx-auto object-contain" />
+                                </div>
+                            )}
                         </div>
+
+                        <button 
+                            onClick={handleSaveConfig}
+                            className="w-full bg-mel-blue text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-800 transition flex items-center justify-center gap-2"
+                        >
+                            <Save size={20} /> Salvar Alterações
+                        </button>
                     </div>
                 </div>
             )}

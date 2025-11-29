@@ -1,7 +1,7 @@
 
 import { collection, getDocs, setDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, ensureAuth } from './firebase';
+import { db, storage } from './firebase';
 import { Product, Order, StoreConfig } from '../types';
 import { PRODUCTS, CATEGORIES as DEFAULT_CATEGORIES } from '../constants';
 
@@ -15,41 +15,17 @@ const COLLECTIONS = {
 const DEFAULT_CONFIG: StoreConfig = {
   storeName: 'MelKids',
   logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e4/Melkids_Logo.png',
-  whatsappNumber: '244932853435',
-  heroTitle: 'MelKids\nAngola',
-  heroSubtitle: 'Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.'
-};
-
-const handleFirebaseError = (error: any) => {
-  console.error("Firebase Operation Error:", error);
-  if (error.code === 'permission-denied') {
-    throw new Error("PERMISSÃO NEGADA: Vá no Firebase Console > Firestore/Storage > Rules e mude para 'allow read, write: if true;' (ou configure autenticação).");
-  }
-  if (error.message && error.message.includes("Login Anônimo")) {
-    throw error; // Re-throw auth errors directly
-  }
-  throw new Error("Erro na operação: " + (error.message || "Erro desconhecido"));
+  whatsappNumber: '244932853435'
 };
 
 export const dataService = {
   // --- UPLOAD ---
-  uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
+  uploadImage: async (file: File): Promise<string> => {
     if (!storage) throw new Error("Firebase Storage não configurado.");
     
-    // Client-side validation for better UX
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error("A imagem é muito grande. O tamanho máximo é 5MB.");
-    }
-    
-    try {
-      await ensureAuth();
-      const storageRef = ref(storage, `${folder}/${Date.now()}-${file.name}`);
-      await uploadBytes(storageRef, file);
-      return await getDownloadURL(storageRef);
-    } catch (error) {
-      handleFirebaseError(error);
-      return "";
-    }
+    const storageRef = ref(storage, `products/${Date.now()}-${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
   },
 
   // --- CATEGORIES ---
@@ -70,102 +46,69 @@ export const dataService = {
 
   saveCategories: async (categories: string[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    try {
-      await ensureAuth();
-      await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: categories });
-    } catch (error) {
-      handleFirebaseError(error);
-    }
+    // Saving as a single document for simplicity
+    await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: categories });
   },
 
   // --- PRODUCTS ---
   getProducts: async (): Promise<Product[]> => {
-    if (!db) return []; 
+    if (!db) return []; // Return empty if not connected, no more mock data fallback
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTIONS.PRODUCTS));
       const products: Product[] = [];
       querySnapshot.forEach((doc) => {
         products.push(doc.data() as Product);
       });
+      
+      // If DB is completely empty (first run), we might want to return empty 
+      // or optionally seed it. For "Real Mode", we start empty or whatever is in DB.
       return products;
     } catch (error) {
       console.error("Error fetching products:", error);
-      // Don't throw here to avoid white screen, just return empty
-      return [];
+      throw error;
     }
   },
 
   saveProduct: async (product: Product): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    try {
-      await ensureAuth();
-      const id = product.id === 0 ? Date.now() : product.id;
-      const finalProduct = { ...product, id };
-      await setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
-    } catch (error) {
-      handleFirebaseError(error);
-    }
+    // Ensure ID exists
+    const id = product.id === 0 ? Date.now() : product.id;
+    const finalProduct = { ...product, id };
+    
+    await setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
   },
 
-  // Bulk Import
+  // NEW: Bulk Import
   importProductsBatch: async (products: Product[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    try {
-      await ensureAuth();
-      const promises = products.map(product => {
-          const id = product.id || Date.now() + Math.floor(Math.random() * 1000);
-          const finalProduct = { ...product, id };
-          return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
-      });
-      await Promise.all(promises);
-    } catch (error) {
-      handleFirebaseError(error);
-    }
-  },
+    
+    const promises = products.map(product => {
+        const id = product.id || Date.now() + Math.floor(Math.random() * 1000);
+        const finalProduct = { ...product, id };
+        return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
+    });
 
-  // Seed Initial Data (Restaurar Padrão)
-  seedInitialData: async (): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    try {
-      await ensureAuth();
-
-      // 1. Save Default Categories
-      await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: DEFAULT_CATEGORIES });
-
-      // 2. Save Default Config
-      await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), DEFAULT_CONFIG);
-
-      // 3. Save Default Products
-      const promises = PRODUCTS.map(product => {
-          return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(product.id)), product);
-      });
-      await Promise.all(promises);
-    } catch (error) {
-      handleFirebaseError(error);
-    }
+    await Promise.all(promises);
   },
 
   deleteProduct: async (id: number): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    try {
-      await ensureAuth();
-      await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)));
-    } catch (error) {
-      handleFirebaseError(error);
-    }
+    await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)));
   },
 
   // --- ORDERS ---
   getOrders: async (): Promise<Order[]> => {
     if (!db) return [];
     try {
-      await ensureAuth();
+      // Trying to sort by date descending
       const q = query(collection(db, COLLECTIONS.ORDERS)); 
+      // Note: "orderBy" requires an index in Firestore sometimes, simple query is safer for start
       const querySnapshot = await getDocs(q);
       const orders: Order[] = [];
       querySnapshot.forEach((doc) => {
         orders.push(doc.data() as Order);
       });
+      // Manual sort
       return orders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
       console.error(error);
@@ -175,12 +118,7 @@ export const dataService = {
 
   saveOrder: async (order: Order): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    try {
-      await ensureAuth();
-      await setDoc(doc(db, COLLECTIONS.ORDERS, order.id), order);
-    } catch (error) {
-      handleFirebaseError(error);
-    }
+    await setDoc(doc(db, COLLECTIONS.ORDERS, order.id), order);
   },
 
   // --- CONFIG ---
@@ -199,11 +137,6 @@ export const dataService = {
 
   saveConfig: async (config: StoreConfig): Promise<void> => {
      if (!db) throw new Error("Banco de dados não conectado.");
-     try {
-       await ensureAuth();
-       await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), config);
-     } catch (error) {
-       handleFirebaseError(error);
-     }
+     await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), config);
   }
 };

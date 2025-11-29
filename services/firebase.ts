@@ -1,10 +1,8 @@
+
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
-// Reads from Vercel Environment Variables (Secure)
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
   authDomain: process.env.FIREBASE_AUTH_DOMAIN,
@@ -14,67 +12,17 @@ const firebaseConfig = {
   appId: process.env.FIREBASE_APP_ID
 };
 
-// Check if keys are present to prevent crash on initialize
+// Check if critical keys exist
 const hasKeys = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
 
-let app: any;
-let db: any;
-let storage: any;
-let auth: any;
+export const app = hasKeys ? initializeApp(firebaseConfig) : null;
+export const db = app ? getFirestore(app) : null;
+export const storage = app ? getStorage(app) : null;
 
-if (hasKeys) {
-  try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    storage = getStorage(app);
-    auth = getAuth(app);
-  } catch (error) {
-    console.error("Firebase init error:", error);
-  }
-}
+export const isConfigured = hasKeys;
 
-// Helper to ensure user is authenticated (anonymously) before operations
-// This fixes "Missing or insufficient permissions" errors on Storage/Firestore
-export const ensureAuth = async () => {
-  if (!auth) {
-    console.warn("Auth not initialized. Check keys.");
-    return;
-  }
-  
-  if (!auth.currentUser) {
-    try {
-      console.log("Tentando login anônimo no Firebase...");
-      await signInAnonymously(auth);
-      console.log("Login anônimo realizado com sucesso. UID:", auth.currentUser?.uid);
-    } catch (error: any) {
-      console.error("Erro CRÍTICO no Login Anônimo:", error);
-      if (error.code === 'auth/admin-restricted-operation' || error.code === 'auth/operation-not-allowed') {
-        throw new Error("O Login Anônimo está DESATIVADO no Firebase Console. Vá em Authentication > Sign-in method e ative 'Anonymous'.");
-      }
-      throw error;
-    }
-  }
-};
-
-// Safe Analytics Initialization
-let analytics: Analytics | null = null;
-
-if (typeof window !== 'undefined' && app) {
-  isSupported().then(supported => {
-    if (supported) {
-      try {
-        analytics = getAnalytics(app);
-      } catch (e) {
-        console.warn("Analytics blocked by client");
-      }
-    }
-  }).catch(() => {});
-}
-
-export { db, storage, auth, analytics };
-
-// Helper to check configuration status in Admin Dashboard
 export const getConfigStatus = () => {
+  const missingKeys: string[] = [];
   const envVars = [
     { key: 'FIREBASE_API_KEY', val: firebaseConfig.apiKey },
     { key: 'FIREBASE_AUTH_DOMAIN', val: firebaseConfig.authDomain },
@@ -84,7 +32,9 @@ export const getConfigStatus = () => {
     { key: 'FIREBASE_APP_ID', val: firebaseConfig.appId },
   ];
 
-  const missingKeys = envVars.filter(v => !v.val).map(v => v.key);
+  envVars.forEach(v => {
+    if (!v.val) missingKeys.push(v.key);
+  });
 
   return {
     isConfigured: missingKeys.length === 0,

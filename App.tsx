@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
 import { Product, CartItem, Category, StoreConfig } from './types';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetails } from './components/ProductDetails';
@@ -20,9 +19,7 @@ const App: React.FC = () => {
   const [storeConfig, setStoreConfig] = useState<StoreConfig>({
     storeName: 'MelKids',
     logoUrl: '',
-    whatsappNumber: '',
-    heroTitle: 'MelKids\nAngola',
-    heroSubtitle: 'Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças.'
+    whatsappNumber: ''
   });
   const [loadingData, setLoadingData] = useState(true);
 
@@ -129,6 +126,18 @@ const App: React.FC = () => {
     return <AdminDashboard />;
   }
 
+  // Loading Screen
+  if (loadingData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-mel-blue border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-mel-blue font-bold animate-pulse">Carregando a lojinha...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Render Store
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-gray-800">
@@ -205,45 +214,39 @@ const App: React.FC = () => {
 
           {/* Categories Nav */}
           <nav className={`mt-6 pb-2 overflow-x-auto scrollbar-hide flex gap-3 ${isMobileMenuOpen ? 'flex-wrap' : 'whitespace-nowrap'}`}>
-            {loadingData ? (
-                // Skeleton Categories
-                [...Array(6)].map((_, i) => (
-                    <div key={i} className="h-9 w-24 bg-gray-200 rounded-full animate-pulse"></div>
-                ))
-            ) : (
-                categories.map(cat => (
-                <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`
-                    px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 select-none
-                    ${selectedCategory === cat 
-                        ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/30 transform scale-105' 
-                        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100 hover:border-gray-200'}
-                    `}
-                >
-                    {cat}
-                </button>
-                ))
-            )}
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`
+                  px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 select-none
+                  ${selectedCategory === cat 
+                    ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/30 transform scale-105' 
+                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100 hover:border-gray-200'}
+                `}
+              >
+                {cat}
+              </button>
+            ))}
           </nav>
         </div>
       </header>
 
       {/* Hero Section */}
-      {selectedCategory === 'Todos' && !searchQuery && !loadingData && (
-        <div className="relative overflow-hidden bg-mel-cyan/10 py-16 px-4 mb-10 animate-fade-in">
+      {selectedCategory === 'Todos' && !searchQuery && (
+        <div className="relative overflow-hidden bg-mel-cyan/10 py-16 px-4 mb-10">
           <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-mel-cyan/20 to-transparent pointer-events-none"></div>
           <div className="container mx-auto flex flex-col md:flex-row items-center justify-between relative z-10">
             <div className="md:w-1/2 mb-10 md:mb-0 space-y-6">
               <span className="inline-block bg-white text-mel-orange font-bold px-4 py-1.5 rounded-full text-sm shadow-sm mb-2 transform rotate-1">
                 Nova Coleção 2024 🚀
               </span>
-              <h1 className="text-5xl md:text-6xl font-black leading-[1.1] text-mel-blue whitespace-pre-line">
-                {storeConfig.heroTitle || `${storeConfig.storeName}\nAngola`}
+              <h1 className="text-5xl md:text-6xl font-black leading-[1.1] text-mel-blue">
+                {storeConfig.storeName}<br/>
+                <span className="text-mel-pink">Angola</span>
               </h1>
               <p className="text-lg text-gray-600 max-w-lg leading-relaxed">
-                {storeConfig.heroSubtitle || "Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida."}
+                Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.
               </p>
               <button 
                 onClick={() => {
@@ -284,39 +287,21 @@ const App: React.FC = () => {
       <main id="products-grid" className="container mx-auto px-4 pb-20 flex-grow">
         
         {/* Results Header */}
-        {!loadingData && (
-            <div className="flex items-center justify-between mb-8">
-            <div>
-                <h2 className="text-3xl font-bold text-gray-800">
-                {selectedCategory === 'Todos' ? 'Populares' : selectedCategory}
-                </h2>
-                <p className="text-gray-400 text-sm mt-1">
-                    {filteredProducts.length} produtos encontrados
-                </p>
-            </div>
-            <div className="hidden md:block h-px bg-gray-200 flex-1 mx-6"></div>
-            </div>
-        )}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-800">
+              {selectedCategory === 'Todos' ? 'Populares' : selectedCategory}
+            </h2>
+            <p className="text-gray-400 text-sm mt-1">
+                {filteredProducts.length} produtos encontrados
+            </p>
+          </div>
+          <div className="hidden md:block h-px bg-gray-200 flex-1 mx-6"></div>
+        </div>
 
-        {/* Product Grid - With Skeletons */}
-        {loadingData ? (
-             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
-                {[...Array(8)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-3xl overflow-hidden border border-gray-100 h-[380px] animate-pulse">
-                        <div className="h-[65%] bg-gray-200 w-full"></div>
-                        <div className="p-5 space-y-3">
-                             <div className="h-3 bg-gray-200 rounded w-1/3"></div>
-                             <div className="h-6 bg-gray-200 rounded w-full"></div>
-                             <div className="flex justify-between items-end mt-4">
-                                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                                <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
-                             </div>
-                        </div>
-                    </div>
-                ))}
-             </div>
-        ) : filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8 animate-fade-in-up">
+        {/* Product Grid */}
+        {filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
             {filteredProducts.map(product => (
               <ProductCard 
                 key={product.id} 
@@ -326,33 +311,16 @@ const App: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100 animate-fade-in flex flex-col items-center">
-            {products.length === 0 ? (
-                <>
-                    <div className="bg-yellow-100 p-6 rounded-full mb-6 text-yellow-600">
-                        <AlertTriangle size={64} />
-                    </div>
-                    <h3 className="text-2xl font-bold text-gray-800 mb-2">Loja em Construção 🚧</h3>
-                    <p className="text-gray-500 mb-6 max-w-md">
-                        Ainda não temos produtos cadastrados. Se você é o dono da loja, acesse o painel administrativo para adicionar itens ou restaurar os dados de exemplo.
-                    </p>
-                    <a href="/ad" className="px-8 py-3 bg-mel-blue text-white font-bold rounded-full shadow-lg hover:bg-blue-800 transition">
-                        Ir para o Admin
-                    </a>
-                </>
-            ) : (
-                <>
-                    <Filter size={64} className="mx-auto text-gray-200 mb-6" />
-                    <h3 className="text-2xl font-bold text-gray-600 mb-2">Ops! Nenhum produto.</h3>
-                    <p className="text-gray-400 mb-6">Não encontramos nada com esses filtros.</p>
-                    <button 
-                    onClick={() => {setSelectedCategory('Todos'); setSearchQuery('');}}
-                    className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-full transition"
-                    >
-                    Limpar Busca
-                    </button>
-                </>
-            )}
+          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100">
+            <Filter size={64} className="mx-auto text-gray-200 mb-6" />
+            <h3 className="text-2xl font-bold text-gray-600 mb-2">Ops! Nenhum produto.</h3>
+            <p className="text-gray-400 mb-6">Não encontramos nada com esses filtros.</p>
+            <button 
+              onClick={() => {setSelectedCategory('Todos'); setSearchQuery('');}}
+              className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-full transition"
+            >
+              Limpar Busca
+            </button>
           </div>
         )}
       </main>
