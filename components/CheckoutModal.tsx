@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { X, Smartphone, MapPin, User, FileText, MessageCircle } from 'lucide-react';
 import { UserDetails, CartItem } from '../types';
+import { dataService } from '../services/dataService';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -23,12 +25,26 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Format the message for WhatsApp
+    // 1. Save Order to Admin History
+    const config = dataService.getConfig();
+    const orderId = `#${Math.floor(Math.random() * 10000)}`;
+    
+    dataService.saveOrder({
+      id: orderId,
+      date: new Date().toISOString(),
+      customer: formData,
+      items: cart,
+      total: total,
+      status: 'pending'
+    });
+
+    // 2. Format the message for WhatsApp
     const itemsList = cart.map(item => 
       `• ${item.name} (x${item.quantity}) - Kz ${(item.price * item.quantity).toLocaleString('pt-AO')}`
     ).join('\n');
 
-    const message = `*Novo Pedido - MelKids* 🧸\n\n` +
+    const message = `*Novo Pedido - ${config.storeName}* 🧸\n` +
+      `*Pedido:* ${orderId}\n\n` +
       `*Dados do Cliente:*\n` +
       `👤 Nome: ${formData.name}\n` +
       `📱 Telefone: ${formData.phone}\n` +
@@ -40,13 +56,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
       `_Envio o comprovativo em seguida!_ 👇`;
 
     const encodedMessage = encodeURIComponent(message);
-    const whatsappNumber = "244932853435"; // Format: CountryCode + Number
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+    const whatsappUrl = `https://wa.me/${config.whatsappNumber}?text=${encodedMessage}`;
 
-    // Open WhatsApp
+    // 3. Open WhatsApp
     window.open(whatsappUrl, '_blank');
     
-    // Clear cart and close
+    // 4. Clear cart and close
     clearCart();
     onClose();
   };
