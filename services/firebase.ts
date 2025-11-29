@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY,
@@ -15,6 +16,7 @@ const isConfigured = !!firebaseConfig.apiKey;
 
 const app = isConfigured ? initializeApp(firebaseConfig) : null;
 export const db = isConfigured ? getFirestore(app!) : null;
+export const storage = isConfigured ? getStorage(app!) : null;
 
 if (!isConfigured) {
   console.warn("Firebase not configured. Using LocalStorage fallback.");

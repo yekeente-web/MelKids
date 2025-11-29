@@ -1,36 +1,43 @@
 import React, { useState, useEffect } from 'react';
-import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, Image, LogOut, CheckCircle, XCircle } from 'lucide-react';
+import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, Image, LogOut, CheckCircle, XCircle, List, UploadCloud } from 'lucide-react';
 import { Product, Order, StoreConfig } from '../../types';
 import { dataService } from '../../services/dataService';
 
 export const AdminDashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'settings' | 'categories'>('products');
   
   // Data State
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
   const [config, setConfig] = useState<StoreConfig>({
       storeName: '',
       logoUrl: '',
       whatsappNumber: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Upload State
+  const [isUploading, setIsUploading] = useState(false);
 
   // Editing State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
 
   const fetchData = async () => {
     setIsLoading(true);
-    const [p, o, c] = await Promise.all([
+    const [p, o, c, cats] = await Promise.all([
         dataService.getProducts(),
         dataService.getOrders(),
-        dataService.getConfig()
+        dataService.getConfig(),
+        dataService.getCategories()
     ]);
     setProducts(p);
     setOrders(o);
     setConfig(c);
+    setCategories(cats.filter(c => c !== 'Todos')); // Hide 'Todos' from management as it's default
     setIsLoading(false);
   };
 
@@ -58,6 +65,22 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && editingProduct) {
+        setIsUploading(true);
+        try {
+            const url = await dataService.uploadImage(file);
+            setEditingProduct({ ...editingProduct, image: url });
+        } catch (error) {
+            alert('Erro ao enviar imagem. Verifique se o Firebase Storage está ativado.');
+            console.error(error);
+        } finally {
+            setIsUploading(false);
+        }
+    }
+  };
+
   const handleDeleteProduct = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir este produto?')) {
       await dataService.deleteProduct(id);
@@ -68,6 +91,22 @@ export const AdminDashboard: React.FC = () => {
   const handleSaveConfig = async () => {
     await dataService.saveConfig(config);
     alert('Configurações salvas!');
+  };
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    const updated = [...categories, newCategoryName.trim()];
+    await dataService.saveCategories(updated);
+    setCategories(updated);
+    setNewCategoryName('');
+  };
+
+  const handleDeleteCategory = async (cat: string) => {
+    if (confirm(`Remover categoria "${cat}"?`)) {
+        const updated = categories.filter(c => c !== cat);
+        await dataService.saveCategories(updated);
+        setCategories(updated);
+    }
   };
 
   if (!isAuthenticated) {
@@ -113,7 +152,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </header>
 
-      <div className="flex flex-1 container mx-auto px-4 py-8 gap-8">
+      <div className="flex flex-1 container mx-auto px-4 py-8 gap-8 flex-col md:flex-row">
         {/* Sidebar */}
         <aside className="w-full md:w-64 flex-shrink-0 space-y-2">
             <button 
@@ -121,6 +160,12 @@ export const AdminDashboard: React.FC = () => {
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'products' ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/20' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
             >
                 <Package size={20} /> Produtos
+            </button>
+            <button 
+                onClick={() => setActiveTab('categories')}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition ${activeTab === 'categories' ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/20' : 'bg-white text-gray-600 hover:bg-gray-100'}`}
+            >
+                <List size={20} /> Categorias
             </button>
             <button 
                 onClick={() => setActiveTab('orders')}
@@ -151,7 +196,7 @@ export const AdminDashboard: React.FC = () => {
                     <div className="flex justify-between items-center">
                         <h2 className="text-2xl font-bold text-gray-800">Gerenciar Produtos</h2>
                         <button 
-                            onClick={() => setEditingProduct({ id: 0, name: '', price: 0, category: 'Roupas', description: '', image: '', isNew: true, soldOut: false })}
+                            onClick={() => setEditingProduct({ id: 0, name: '', price: 0, category: categories[0] || 'Roupas', description: '', image: '', isNew: true, soldOut: false })}
                             className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"
                         >
                             <Plus size={20} /> Novo Produto
@@ -178,18 +223,58 @@ export const AdminDashboard: React.FC = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Categoria</label>
-                                            <select className="w-full p-3 border rounded-lg bg-gray-50" value={editingProduct.category || 'Roupas'} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
-                                                <option value="Roupas">Roupas</option>
-                                                <option value="Calçados">Calçados</option>
-                                                <option value="Bebê">Bebê</option>
-                                                <option value="Acessórios">Acessórios</option>
-                                                <option value="Outros">Outros</option>
+                                            <select className="w-full p-3 border rounded-lg bg-gray-50" value={editingProduct.category || ''} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})}>
+                                                {categories.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">URL da Imagem</label>
-                                            <div className="flex gap-2">
-                                                <input required className="w-full p-3 border rounded-lg bg-gray-50" value={editingProduct.image || ''} onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} placeholder="https://..." />
+                                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Imagem do Produto</label>
+                                            <div className="flex flex-col gap-2">
+                                                {/* Image Preview */}
+                                                {editingProduct.image && (
+                                                    <div className="relative w-full h-32 bg-gray-100 rounded-lg overflow-hidden border">
+                                                        <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                                                        <button 
+                                                            type="button" 
+                                                            onClick={() => setEditingProduct({...editingProduct, image: ''})}
+                                                            className="absolute top-1 right-1 bg-white rounded-full p-1 text-red-500 shadow-sm"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Upload Button */}
+                                                {!editingProduct.image && (
+                                                    <label className={`
+                                                        w-full h-32 flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition
+                                                        ${isUploading ? 'bg-gray-100 border-gray-300' : 'border-mel-blue/30 hover:bg-mel-blue/5'}
+                                                    `}>
+                                                        {isUploading ? (
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-8 h-8 border-4 border-mel-blue border-t-transparent rounded-full animate-spin mb-2"></div>
+                                                                <span className="text-xs text-gray-500">Enviando...</span>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <UploadCloud className="text-mel-blue mb-2" size={32} />
+                                                                <span className="text-sm font-bold text-gray-600">Clique para enviar foto</span>
+                                                                <span className="text-xs text-gray-400 mt-1">PNG, JPG</span>
+                                                            </>
+                                                        )}
+                                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploading} />
+                                                    </label>
+                                                )}
+                                                
+                                                {/* Manual URL fallback */}
+                                                <input 
+                                                    className="w-full p-2 text-xs border rounded bg-gray-50 text-gray-400" 
+                                                    value={editingProduct.image || ''} 
+                                                    onChange={e => setEditingProduct({...editingProduct, image: e.target.value})} 
+                                                    placeholder="Ou cole o link da imagem aqui..." 
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -212,7 +297,9 @@ export const AdminDashboard: React.FC = () => {
 
                                     <div className="flex justify-end gap-3 pt-4 border-t">
                                         <button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
-                                        <button type="submit" className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700">Salvar Produto</button>
+                                        <button type="submit" disabled={isUploading} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                            {isUploading ? 'Aguarde...' : 'Salvar Produto'}
+                                        </button>
                                     </div>
                                 </form>
                             </div>
@@ -262,6 +349,43 @@ export const AdminDashboard: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* CATEGORIES TAB */}
+             {activeTab === 'categories' && (
+                <div className="space-y-6 max-w-xl">
+                    <h2 className="text-2xl font-bold text-gray-800">Gerenciar Categorias</h2>
+                    
+                    <div className="flex gap-2">
+                        <input 
+                            value={newCategoryName}
+                            onChange={e => setNewCategoryName(e.target.value)}
+                            placeholder="Nova Categoria..."
+                            className="flex-1 p-3 border rounded-xl"
+                        />
+                        <button 
+                            onClick={handleAddCategory}
+                            disabled={!newCategoryName.trim()}
+                            className="bg-mel-blue text-white px-6 rounded-xl font-bold hover:bg-blue-800 disabled:opacity-50"
+                        >
+                            Adicionar
+                        </button>
+                    </div>
+
+                    <div className="space-y-2">
+                        {categories.map(cat => (
+                            <div key={cat} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <span className="font-bold text-gray-700">{cat}</span>
+                                <button 
+                                    onClick={() => handleDeleteCategory(cat)}
+                                    className="text-red-400 hover:text-red-600 p-2 hover:bg-white rounded-lg transition"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}

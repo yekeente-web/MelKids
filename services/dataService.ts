@@ -1,12 +1,14 @@
 import { Product, Order, StoreConfig } from '../types';
-import { PRODUCTS } from '../constants';
-import { db, isConfigured } from './firebase';
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import { PRODUCTS, CATEGORIES as DEFAULT_CATEGORIES } from '../constants';
+import { db, storage, isConfigured } from './firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, orderBy, getDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const KEYS = {
   PRODUCTS: 'melkids_products',
   ORDERS: 'melkids_orders',
-  CONFIG: 'melkids_config'
+  CONFIG: 'melkids_config',
+  CATEGORIES: 'melkids_categories'
 };
 
 const DEFAULT_CONFIG: StoreConfig = {
@@ -37,18 +39,62 @@ const localStore = {
     const stored = localStorage.getItem(KEYS.CONFIG);
     return stored ? JSON.parse(stored) : DEFAULT_CONFIG;
   },
-  saveConfig: (config: StoreConfig) => localStorage.setItem(KEYS.CONFIG, JSON.stringify(config))
+  saveConfig: (config: StoreConfig) => localStorage.setItem(KEYS.CONFIG, JSON.stringify(config)),
+
+  getCategories: (): string[] => {
+    const stored = localStorage.getItem(KEYS.CATEGORIES);
+    return stored ? JSON.parse(stored) : DEFAULT_CATEGORIES;
+  },
+  saveCategories: (categories: string[]) => localStorage.setItem(KEYS.CATEGORIES, JSON.stringify(categories))
 };
 
 export const dataService = {
+  // --- UPLOAD ---
+  uploadImage: async (file: File): Promise<string> => {
+    if (isConfigured && storage) {
+      try {
+        const storageRef = ref(storage, `images/${Date.now()}_${file.name}`);
+        const snapshot = await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(snapshot.ref);
+        return downloadURL;
+      } catch (e) {
+        console.error("Upload Error", e);
+        throw new Error("Falha ao fazer upload da imagem.");
+      }
+    }
+    throw new Error("Armazenamento não configurado.");
+  },
+
+  // --- CATEGORIES ---
+  getCategories: async (): Promise<string[]> => {
+    if (isConfigured && db) {
+      try {
+        const docSnap = await getDoc(doc(db, 'config', 'categories'));
+        if (docSnap.exists()) {
+          return docSnap.data().list as string[];
+        }
+        return DEFAULT_CATEGORIES;
+      } catch (e) { console.error(e) }
+    }
+    return localStore.getCategories();
+  },
+
+  saveCategories: async (categories: string[]): Promise<void> => {
+    if (isConfigured && db) {
+      try {
+        await setDoc(doc(db, 'config', 'categories'), { list: categories });
+        return;
+      } catch (e) { console.error(e) }
+    }
+    localStore.saveCategories(categories);
+  },
+
   // --- PRODUCTS ---
   getProducts: async (): Promise<Product[]> => {
     if (isConfigured && db) {
       try {
         const querySnapshot = await getDocs(collection(db, 'products'));
         if (querySnapshot.empty) {
-          // Se estiver vazio no Firebase, opcional: seedar com dados iniciais
-          // Para evitar complexidade agora, retornamos array vazio ou seed manual
           return [];
         }
         return querySnapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Product));
@@ -63,10 +109,9 @@ export const dataService = {
   saveProduct: async (product: Product): Promise<void> => {
     if (isConfigured && db) {
       try {
-        // Se id for 0, gera novo ID
         let idToSave = product.id;
         if (idToSave === 0) {
-           idToSave = Date.now(); // Simple ID generation
+           idToSave = Date.now();
         }
         await setDoc(doc(db, 'products', String(idToSave)), { ...product, id: idToSave });
         return;
@@ -130,7 +175,17 @@ export const dataService = {
       try {
         const docSnap = await getDocs(collection(db, 'config'));
         if (!docSnap.empty) {
-          return docSnap.docs[0].data() as StoreConfig;
+          // Check if main config exists among docs (handling potential multiple docs structure)
+          // Simplified: Assume 'main' doc ID or first doc
+          const mainDoc = docSnap.docs.find(d => d.id === 'main') || docSnap.docs[0];
+          
+          // Filter out 'categories' doc if it was fetched in the collection query by mistake
+          if (mainDoc.id !== 'categories') {
+             return mainDoc.data() as StoreConfig;
+          }
+           // Explicit fetch if needed
+           const explicitMain = await getDoc(doc(db, 'config', 'main'));
+           if(explicitMain.exists()) return explicitMain.data() as StoreConfig;
         }
       } catch (e) { console.error(e) }
     }
@@ -140,7 +195,6 @@ export const dataService = {
   saveConfig: async (config: StoreConfig): Promise<void> => {
      if (isConfigured && db) {
        try {
-         // Sempre sobrescreve o doc 'main'
          await setDoc(doc(db, 'config', 'main'), config);
          return;
        } catch (e) { console.error(e) }

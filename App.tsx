@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
 import { Product, CartItem, Category, StoreConfig } from './types';
-import { CATEGORIES } from './constants';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetails } from './components/ProductDetails';
 import { CartDrawer } from './components/CartDrawer';
@@ -16,6 +15,7 @@ const App: React.FC = () => {
 
   // App Data State
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>(['Todos']);
   const [storeConfig, setStoreConfig] = useState<StoreConfig>({
     storeName: 'MelKids',
     logoUrl: '',
@@ -44,12 +44,18 @@ const App: React.FC = () => {
     const loadData = async () => {
       setLoadingData(true);
       try {
-        const [prods, conf] = await Promise.all([
+        const [prods, conf, cats] = await Promise.all([
           dataService.getProducts(),
-          dataService.getConfig()
+          dataService.getConfig(),
+          dataService.getCategories()
         ]);
         setProducts(prods);
         setStoreConfig(conf);
+        
+        // Ensure 'Todos' is always first
+        const safeCats = cats.filter(c => c !== 'Todos');
+        setCategories(['Todos', ...safeCats]);
+
       } catch (error) {
         console.error("Failed to load data", error);
       } finally {
@@ -208,7 +214,7 @@ const App: React.FC = () => {
 
           {/* Categories Nav */}
           <nav className={`mt-6 pb-2 overflow-x-auto scrollbar-hide flex gap-3 ${isMobileMenuOpen ? 'flex-wrap' : 'whitespace-nowrap'}`}>
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
