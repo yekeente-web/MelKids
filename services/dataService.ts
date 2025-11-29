@@ -20,10 +20,15 @@ const DEFAULT_CONFIG: StoreConfig = {
 
 export const dataService = {
   // --- UPLOAD ---
-  uploadImage: async (file: File): Promise<string> => {
+  uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
     if (!storage) throw new Error("Firebase Storage não configurado.");
     
-    const storageRef = ref(storage, `products/${Date.now()}-${file.name}`);
+    // Client-side validation for better UX
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("A imagem é muito grande. O tamanho máximo é 5MB.");
+    }
+    
+    const storageRef = ref(storage, `${folder}/${Date.now()}-${file.name}`);
     await uploadBytes(storageRef, file);
     return await getDownloadURL(storageRef);
   },
@@ -52,16 +57,13 @@ export const dataService = {
 
   // --- PRODUCTS ---
   getProducts: async (): Promise<Product[]> => {
-    if (!db) return []; // Return empty if not connected, no more mock data fallback
+    if (!db) return []; 
     try {
       const querySnapshot = await getDocs(collection(db, COLLECTIONS.PRODUCTS));
       const products: Product[] = [];
       querySnapshot.forEach((doc) => {
         products.push(doc.data() as Product);
       });
-      
-      // If DB is completely empty (first run), we might want to return empty 
-      // or optionally seed it. For "Real Mode", we start empty or whatever is in DB.
       return products;
     } catch (error) {
       console.error("Error fetching products:", error);
@@ -78,7 +80,7 @@ export const dataService = {
     await setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
   },
 
-  // NEW: Bulk Import
+  // Bulk Import
   importProductsBatch: async (products: Product[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
     
@@ -100,9 +102,7 @@ export const dataService = {
   getOrders: async (): Promise<Order[]> => {
     if (!db) return [];
     try {
-      // Trying to sort by date descending
       const q = query(collection(db, COLLECTIONS.ORDERS)); 
-      // Note: "orderBy" requires an index in Firestore sometimes, simple query is safer for start
       const querySnapshot = await getDocs(q);
       const orders: Order[] = [];
       querySnapshot.forEach((doc) => {

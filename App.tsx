@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
 import { Product, CartItem, Category, StoreConfig } from './types';
@@ -126,18 +127,6 @@ const App: React.FC = () => {
     return <AdminDashboard />;
   }
 
-  // Loading Screen
-  if (loadingData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-mel-blue border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-mel-blue font-bold animate-pulse">Carregando a lojinha...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Render Store
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-gray-800">
@@ -214,27 +203,34 @@ const App: React.FC = () => {
 
           {/* Categories Nav */}
           <nav className={`mt-6 pb-2 overflow-x-auto scrollbar-hide flex gap-3 ${isMobileMenuOpen ? 'flex-wrap' : 'whitespace-nowrap'}`}>
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`
-                  px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 select-none
-                  ${selectedCategory === cat 
-                    ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/30 transform scale-105' 
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100 hover:border-gray-200'}
-                `}
-              >
-                {cat}
-              </button>
-            ))}
+            {loadingData ? (
+                // Skeleton Categories
+                [...Array(6)].map((_, i) => (
+                    <div key={i} className="h-9 w-24 bg-gray-200 rounded-full animate-pulse"></div>
+                ))
+            ) : (
+                categories.map(cat => (
+                <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`
+                    px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 select-none
+                    ${selectedCategory === cat 
+                        ? 'bg-mel-blue text-white shadow-lg shadow-mel-blue/30 transform scale-105' 
+                        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100 hover:border-gray-200'}
+                    `}
+                >
+                    {cat}
+                </button>
+                ))
+            )}
           </nav>
         </div>
       </header>
 
       {/* Hero Section */}
-      {selectedCategory === 'Todos' && !searchQuery && (
-        <div className="relative overflow-hidden bg-mel-cyan/10 py-16 px-4 mb-10">
+      {selectedCategory === 'Todos' && !searchQuery && !loadingData && (
+        <div className="relative overflow-hidden bg-mel-cyan/10 py-16 px-4 mb-10 animate-fade-in">
           <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-mel-cyan/20 to-transparent pointer-events-none"></div>
           <div className="container mx-auto flex flex-col md:flex-row items-center justify-between relative z-10">
             <div className="md:w-1/2 mb-10 md:mb-0 space-y-6">
@@ -287,21 +283,39 @@ const App: React.FC = () => {
       <main id="products-grid" className="container mx-auto px-4 pb-20 flex-grow">
         
         {/* Results Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h2 className="text-3xl font-bold text-gray-800">
-              {selectedCategory === 'Todos' ? 'Populares' : selectedCategory}
-            </h2>
-            <p className="text-gray-400 text-sm mt-1">
-                {filteredProducts.length} produtos encontrados
-            </p>
-          </div>
-          <div className="hidden md:block h-px bg-gray-200 flex-1 mx-6"></div>
-        </div>
+        {!loadingData && (
+            <div className="flex items-center justify-between mb-8">
+            <div>
+                <h2 className="text-3xl font-bold text-gray-800">
+                {selectedCategory === 'Todos' ? 'Populares' : selectedCategory}
+                </h2>
+                <p className="text-gray-400 text-sm mt-1">
+                    {filteredProducts.length} produtos encontrados
+                </p>
+            </div>
+            <div className="hidden md:block h-px bg-gray-200 flex-1 mx-6"></div>
+            </div>
+        )}
 
-        {/* Product Grid */}
-        {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+        {/* Product Grid - With Skeletons */}
+        {loadingData ? (
+             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
+                {[...Array(8)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-3xl overflow-hidden border border-gray-100 h-[380px] animate-pulse">
+                        <div className="h-[65%] bg-gray-200 w-full"></div>
+                        <div className="p-5 space-y-3">
+                             <div className="h-3 bg-gray-200 rounded w-1/3"></div>
+                             <div className="h-6 bg-gray-200 rounded w-full"></div>
+                             <div className="flex justify-between items-end mt-4">
+                                <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                                <div className="h-8 w-8 bg-gray-200 rounded-full"></div>
+                             </div>
+                        </div>
+                    </div>
+                ))}
+             </div>
+        ) : filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8 animate-fade-in-up">
             {filteredProducts.map(product => (
               <ProductCard 
                 key={product.id} 
@@ -311,7 +325,7 @@ const App: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100">
+          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100 animate-fade-in">
             <Filter size={64} className="mx-auto text-gray-200 mb-6" />
             <h3 className="text-2xl font-bold text-gray-600 mb-2">Ops! Nenhum produto.</h3>
             <p className="text-gray-400 mb-6">Não encontramos nada com esses filtros.</p>
