@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getAnalytics, isSupported, Analytics } from "firebase/analytics";
 
 // Reads from Vercel Environment Variables (Secure)
@@ -19,16 +20,31 @@ const hasKeys = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
 let app: any;
 let db: any;
 let storage: any;
+let auth: any;
 
 if (hasKeys) {
   try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     storage = getStorage(app);
+    auth = getAuth(app);
   } catch (error) {
     console.error("Firebase init error:", error);
   }
 }
+
+// Helper to ensure user is authenticated (anonymously) before operations
+// This fixes "Missing or insufficient permissions" errors on Storage/Firestore
+export const ensureAuth = async () => {
+  if (auth && !auth.currentUser) {
+    try {
+      await signInAnonymously(auth);
+      console.log("Authenticated anonymously for database access");
+    } catch (error) {
+      console.error("Auth error:", error);
+    }
+  }
+};
 
 // Safe Analytics Initialization
 let analytics: Analytics | null = null;
@@ -45,7 +61,7 @@ if (typeof window !== 'undefined' && app) {
   }).catch(() => {});
 }
 
-export { db, storage, analytics };
+export { db, storage, auth, analytics };
 
 // Helper to check configuration status in Admin Dashboard
 export const getConfigStatus = () => {

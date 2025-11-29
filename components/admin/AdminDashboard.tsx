@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle, FileInput, Image as ImageIcon } from 'lucide-react';
+import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle, FileInput, Image as ImageIcon, Database } from 'lucide-react';
 import { Product, Order, StoreConfig } from '../../types';
 import { dataService } from '../../services/dataService';
 import { getConfigStatus } from '../../services/firebase';
@@ -20,7 +20,9 @@ export const AdminDashboard: React.FC = () => {
   const [config, setConfig] = useState<StoreConfig>({
       storeName: '',
       logoUrl: '',
-      whatsappNumber: ''
+      whatsappNumber: '',
+      heroTitle: '',
+      heroSubtitle: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   
@@ -94,7 +96,7 @@ export const AdminDashboard: React.FC = () => {
             const url = await dataService.uploadImage(file, 'products');
             setEditingProduct({ ...editingProduct, image: url });
         } catch (error: any) {
-            alert(error.message || 'Erro ao enviar imagem.');
+            alert(error.message || 'Erro ao enviar imagem. Verifique se as chaves do Firebase estão corretas.');
             console.error(error);
         } finally {
             setIsUploading(false);
@@ -166,6 +168,21 @@ export const AdminDashboard: React.FC = () => {
           alert("Erro na importação: " + error.message);
       } finally {
           setIsLoading(false);
+      }
+  };
+
+  const handleSeedData = async () => {
+      if (confirm("Isso vai adicionar os produtos de exemplo e categorias padrão ao banco de dados. Deseja continuar?")) {
+          setIsLoading(true);
+          try {
+              await dataService.seedInitialData();
+              alert("Loja populada com sucesso!");
+              await fetchData();
+          } catch (error: any) {
+              alert("Erro ao popular loja: " + error.message);
+          } finally {
+              setIsLoading(false);
+          }
       }
   };
 
@@ -488,17 +505,22 @@ export const AdminDashboard: React.FC = () => {
 
             {/* SETTINGS TAB */}
             {activeTab === 'settings' && (
-                <div className="space-y-6 max-w-xl">
-                    <h2 className="text-2xl font-bold text-gray-800">Configurações da Loja</h2>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Nome da Loja</label>
-                            <input value={config.storeName} onChange={e => setConfig({...config, storeName: e.target.value})} className="w-full p-3 border rounded-xl" />
+                <div className="space-y-8 max-w-2xl">
+                    {/* General Settings */}
+                    <div className="space-y-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Dados da Loja</h2>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nome da Loja</label>
+                                <input value={config.storeName} onChange={e => setConfig({...config, storeName: e.target.value})} className="w-full p-3 border rounded-xl" />
+                            </div>
+                             <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">WhatsApp (ex: 244932...)</label>
+                                <input value={config.whatsappNumber} onChange={e => setConfig({...config, whatsappNumber: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="244932853435" />
+                            </div>
                         </div>
-                         <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-1">Número do WhatsApp (com código do país, sem +)</label>
-                            <input value={config.whatsappNumber} onChange={e => setConfig({...config, whatsappNumber: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="244932853435" />
-                        </div>
+
                          <div>
                             <label className="block text-sm font-bold text-gray-700 mb-1">Logotipo da Loja</label>
                             
@@ -538,10 +560,42 @@ export const AdminDashboard: React.FC = () => {
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        <button onClick={handleSaveConfig} className="w-full bg-mel-blue text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-800 transition flex items-center justify-center gap-2">
-                            <Save size={20} /> Salvar Alterações
-                        </button>
+                    <div className="h-px bg-gray-200"></div>
+
+                    {/* Hero Settings */}
+                    <div className="space-y-6">
+                        <h2 className="text-2xl font-bold text-gray-800">Personalizar Página Inicial</h2>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Título Principal (Hero)</label>
+                            <input value={config.heroTitle || ''} onChange={e => setConfig({...config, heroTitle: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="Ex: MelKids Angola" />
+                            <p className="text-xs text-gray-400 mt-1">Dica: Use quebras de linha no texto se necessário.</p>
+                        </div>
+                         <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Subtítulo (Texto de Apoio)</label>
+                            <textarea value={config.heroSubtitle || ''} onChange={e => setConfig({...config, heroSubtitle: e.target.value})} className="w-full p-3 border rounded-xl h-24" placeholder="Ex: Descubra roupas incríveis..." />
+                        </div>
+                    </div>
+
+                    <button onClick={handleSaveConfig} className="w-full bg-mel-blue text-white font-bold py-4 rounded-xl shadow-lg hover:bg-blue-800 transition flex items-center justify-center gap-2">
+                        <Save size={20} /> Salvar Alterações
+                    </button>
+
+                    <div className="h-px bg-gray-200"></div>
+
+                    {/* Advanced Actions */}
+                    <div className="space-y-4 pt-4">
+                        <h3 className="text-lg font-bold text-gray-800">Ações Avançadas</h3>
+                        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center justify-between">
+                            <div>
+                                <h4 className="font-bold text-orange-800">Banco de Dados Vazio?</h4>
+                                <p className="text-sm text-orange-700">Restaure os produtos de exemplo para começar.</p>
+                            </div>
+                            <button onClick={handleSeedData} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-sm">
+                                <Database size={16} /> Restaurar Produtos Padrão
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

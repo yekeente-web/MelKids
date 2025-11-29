@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
+import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail, AlertTriangle } from 'lucide-react';
 import { Product, CartItem, Category, StoreConfig } from './types';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetails } from './components/ProductDetails';
@@ -20,7 +20,9 @@ const App: React.FC = () => {
   const [storeConfig, setStoreConfig] = useState<StoreConfig>({
     storeName: 'MelKids',
     logoUrl: '',
-    whatsappNumber: ''
+    whatsappNumber: '',
+    heroTitle: 'MelKids\nAngola',
+    heroSubtitle: 'Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças.'
   });
   const [loadingData, setLoadingData] = useState(true);
 
@@ -237,12 +239,11 @@ const App: React.FC = () => {
               <span className="inline-block bg-white text-mel-orange font-bold px-4 py-1.5 rounded-full text-sm shadow-sm mb-2 transform rotate-1">
                 Nova Coleção 2024 🚀
               </span>
-              <h1 className="text-5xl md:text-6xl font-black leading-[1.1] text-mel-blue">
-                {storeConfig.storeName}<br/>
-                <span className="text-mel-pink">Angola</span>
+              <h1 className="text-5xl md:text-6xl font-black leading-[1.1] text-mel-blue whitespace-pre-line">
+                {storeConfig.heroTitle || `${storeConfig.storeName}\nAngola`}
               </h1>
               <p className="text-lg text-gray-600 max-w-lg leading-relaxed">
-                Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.
+                {storeConfig.heroSubtitle || "Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida."}
               </p>
               <button 
                 onClick={() => {
@@ -325,16 +326,33 @@ const App: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100 animate-fade-in">
-            <Filter size={64} className="mx-auto text-gray-200 mb-6" />
-            <h3 className="text-2xl font-bold text-gray-600 mb-2">Ops! Nenhum produto.</h3>
-            <p className="text-gray-400 mb-6">Não encontramos nada com esses filtros.</p>
-            <button 
-              onClick={() => {setSelectedCategory('Todos'); setSearchQuery('');}}
-              className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-full transition"
-            >
-              Limpar Busca
-            </button>
+          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100 animate-fade-in flex flex-col items-center">
+            {products.length === 0 ? (
+                <>
+                    <div className="bg-yellow-100 p-6 rounded-full mb-6 text-yellow-600">
+                        <AlertTriangle size={64} />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-800 mb-2">Loja em Construção 🚧</h3>
+                    <p className="text-gray-500 mb-6 max-w-md">
+                        Ainda não temos produtos cadastrados. Se você é o dono da loja, acesse o painel administrativo para adicionar itens ou restaurar os dados de exemplo.
+                    </p>
+                    <a href="/ad" className="px-8 py-3 bg-mel-blue text-white font-bold rounded-full shadow-lg hover:bg-blue-800 transition">
+                        Ir para o Admin
+                    </a>
+                </>
+            ) : (
+                <>
+                    <Filter size={64} className="mx-auto text-gray-200 mb-6" />
+                    <h3 className="text-2xl font-bold text-gray-600 mb-2">Ops! Nenhum produto.</h3>
+                    <p className="text-gray-400 mb-6">Não encontramos nada com esses filtros.</p>
+                    <button 
+                    onClick={() => {setSelectedCategory('Todos'); setSearchQuery('');}}
+                    className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-full transition"
+                    >
+                    Limpar Busca
+                    </button>
+                </>
+            )}
           </div>
         )}
       </main>

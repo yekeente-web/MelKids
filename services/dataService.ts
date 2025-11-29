@@ -1,7 +1,7 @@
 
 import { collection, getDocs, setDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from './firebase';
+import { db, storage, ensureAuth } from './firebase';
 import { Product, Order, StoreConfig } from '../types';
 import { PRODUCTS, CATEGORIES as DEFAULT_CATEGORIES } from '../constants';
 
@@ -15,7 +15,9 @@ const COLLECTIONS = {
 const DEFAULT_CONFIG: StoreConfig = {
   storeName: 'MelKids',
   logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e4/Melkids_Logo.png',
-  whatsappNumber: '244932853435'
+  whatsappNumber: '244932853435',
+  heroTitle: 'MelKids\nAngola',
+  heroSubtitle: 'Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.'
 };
 
 export const dataService = {
@@ -28,6 +30,9 @@ export const dataService = {
       throw new Error("A imagem é muito grande. O tamanho máximo é 5MB.");
     }
     
+    // Ensure auth before upload (fixes permission issues)
+    await ensureAuth();
+
     const storageRef = ref(storage, `${folder}/${Date.now()}-${file.name}`);
     await uploadBytes(storageRef, file);
     return await getDownloadURL(storageRef);
@@ -51,6 +56,7 @@ export const dataService = {
 
   saveCategories: async (categories: string[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
+    await ensureAuth();
     // Saving as a single document for simplicity
     await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: categories });
   },
@@ -73,6 +79,7 @@ export const dataService = {
 
   saveProduct: async (product: Product): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
+    await ensureAuth();
     // Ensure ID exists
     const id = product.id === 0 ? Date.now() : product.id;
     const finalProduct = { ...product, id };
@@ -83,6 +90,7 @@ export const dataService = {
   // Bulk Import
   importProductsBatch: async (products: Product[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
+    await ensureAuth();
     
     const promises = products.map(product => {
         const id = product.id || Date.now() + Math.floor(Math.random() * 1000);
@@ -93,8 +101,27 @@ export const dataService = {
     await Promise.all(promises);
   },
 
+  // Seed Initial Data (Restaurar Padrão)
+  seedInitialData: async (): Promise<void> => {
+    if (!db) throw new Error("Banco de dados não conectado.");
+    await ensureAuth();
+
+    // 1. Save Default Categories
+    await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: DEFAULT_CATEGORIES });
+
+    // 2. Save Default Config
+    await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), DEFAULT_CONFIG);
+
+    // 3. Save Default Products
+    const promises = PRODUCTS.map(product => {
+        return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(product.id)), product);
+    });
+    await Promise.all(promises);
+  },
+
   deleteProduct: async (id: number): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
+    await ensureAuth();
     await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)));
   },
 
@@ -102,6 +129,7 @@ export const dataService = {
   getOrders: async (): Promise<Order[]> => {
     if (!db) return [];
     try {
+      await ensureAuth();
       const q = query(collection(db, COLLECTIONS.ORDERS)); 
       const querySnapshot = await getDocs(q);
       const orders: Order[] = [];
@@ -118,6 +146,7 @@ export const dataService = {
 
   saveOrder: async (order: Order): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
+    await ensureAuth();
     await setDoc(doc(db, COLLECTIONS.ORDERS, order.id), order);
   },
 
@@ -137,6 +166,7 @@ export const dataService = {
 
   saveConfig: async (config: StoreConfig): Promise<void> => {
      if (!db) throw new Error("Banco de dados não conectado.");
+     await ensureAuth();
      await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), config);
   }
 };
