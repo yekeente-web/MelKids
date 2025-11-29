@@ -1,172 +1,150 @@
-
-import { collection, getDocs, setDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage, ensureAuth } from './firebase';
 import { Product, Order, StoreConfig } from '../types';
-import { PRODUCTS, CATEGORIES as DEFAULT_CATEGORIES } from '../constants';
+import { PRODUCTS } from '../constants';
+import { db, isConfigured } from './firebase';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, addDoc, query, orderBy } from 'firebase/firestore';
 
-const COLLECTIONS = {
-  PRODUCTS: 'products',
-  ORDERS: 'orders',
-  CONFIG: 'store_config',
-  CATEGORIES: 'categories'
+const KEYS = {
+  PRODUCTS: 'melkids_products',
+  ORDERS: 'melkids_orders',
+  CONFIG: 'melkids_config'
 };
 
 const DEFAULT_CONFIG: StoreConfig = {
   storeName: 'MelKids',
   logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e4/Melkids_Logo.png',
-  whatsappNumber: '244932853435',
-  heroTitle: 'MelKids\nAngola',
-  heroSubtitle: 'Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.'
+  whatsappNumber: '244932853435'
+};
+
+// HELPER: LocalStorage implementation
+const localStore = {
+  getProducts: (): Product[] => {
+    const stored = localStorage.getItem(KEYS.PRODUCTS);
+    if (!stored) {
+      localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(PRODUCTS));
+      return PRODUCTS;
+    }
+    return JSON.parse(stored);
+  },
+  saveProducts: (products: Product[]) => localStorage.setItem(KEYS.PRODUCTS, JSON.stringify(products)),
+  
+  getOrders: (): Order[] => {
+    const stored = localStorage.getItem(KEYS.ORDERS);
+    return stored ? JSON.parse(stored) : [];
+  },
+  saveOrders: (orders: Order[]) => localStorage.setItem(KEYS.ORDERS, JSON.stringify(orders)),
+
+  getConfig: (): StoreConfig => {
+    const stored = localStorage.getItem(KEYS.CONFIG);
+    return stored ? JSON.parse(stored) : DEFAULT_CONFIG;
+  },
+  saveConfig: (config: StoreConfig) => localStorage.setItem(KEYS.CONFIG, JSON.stringify(config))
 };
 
 export const dataService = {
-  // --- UPLOAD ---
-  uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
-    if (!storage) throw new Error("Firebase Storage não configurado.");
-    
-    // Client-side validation for better UX
-    if (file.size > 5 * 1024 * 1024) {
-      throw new Error("A imagem é muito grande. O tamanho máximo é 5MB.");
-    }
-    
-    // Ensure auth before upload (fixes permission issues)
-    await ensureAuth();
-
-    const storageRef = ref(storage, `${folder}/${Date.now()}-${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
-  },
-
-  // --- CATEGORIES ---
-  getCategories: async (): Promise<string[]> => {
-    if (!db) return DEFAULT_CATEGORIES;
-    try {
-      const querySnapshot = await getDocs(collection(db, COLLECTIONS.CATEGORIES));
-      if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
-        return data.list || DEFAULT_CATEGORIES;
-      }
-      return DEFAULT_CATEGORIES;
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      return DEFAULT_CATEGORIES;
-    }
-  },
-
-  saveCategories: async (categories: string[]): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    // Saving as a single document for simplicity
-    await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: categories });
-  },
-
   // --- PRODUCTS ---
   getProducts: async (): Promise<Product[]> => {
-    if (!db) return []; 
-    try {
-      const querySnapshot = await getDocs(collection(db, COLLECTIONS.PRODUCTS));
-      const products: Product[] = [];
-      querySnapshot.forEach((doc) => {
-        products.push(doc.data() as Product);
-      });
-      return products;
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      throw error;
+    if (isConfigured && db) {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'products'));
+        if (querySnapshot.empty) {
+          // Se estiver vazio no Firebase, opcional: seedar com dados iniciais
+          // Para evitar complexidade agora, retornamos array vazio ou seed manual
+          return [];
+        }
+        return querySnapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Product));
+      } catch (e) {
+        console.error("Firebase Read Error", e);
+        return localStore.getProducts();
+      }
     }
+    return localStore.getProducts();
   },
 
   saveProduct: async (product: Product): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    // Ensure ID exists
-    const id = product.id === 0 ? Date.now() : product.id;
-    const finalProduct = { ...product, id };
+    if (isConfigured && db) {
+      try {
+        // Se id for 0, gera novo ID
+        let idToSave = product.id;
+        if (idToSave === 0) {
+           idToSave = Date.now(); // Simple ID generation
+        }
+        await setDoc(doc(db, 'products', String(idToSave)), { ...product, id: idToSave });
+        return;
+      } catch (e) {
+        console.error("Firebase Write Error", e);
+      }
+    }
     
-    await setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
-  },
-
-  // Bulk Import
-  importProductsBatch: async (products: Product[]): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    
-    const promises = products.map(product => {
-        const id = product.id || Date.now() + Math.floor(Math.random() * 1000);
-        const finalProduct = { ...product, id };
-        return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
-    });
-
-    await Promise.all(promises);
-  },
-
-  // Seed Initial Data (Restaurar Padrão)
-  seedInitialData: async (): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-
-    // 1. Save Default Categories
-    await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: DEFAULT_CATEGORIES });
-
-    // 2. Save Default Config
-    await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), DEFAULT_CONFIG);
-
-    // 3. Save Default Products
-    const promises = PRODUCTS.map(product => {
-        return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(product.id)), product);
-    });
-    await Promise.all(promises);
+    // Fallback LocalStorage Logic
+    const products = localStore.getProducts();
+    const index = products.findIndex(p => p.id === product.id);
+    if (index >= 0) {
+      products[index] = product;
+    } else {
+      const newId = Math.max(...products.map(p => p.id), 0) + 1;
+      products.push({ ...product, id: newId });
+    }
+    localStore.saveProducts(products);
   },
 
   deleteProduct: async (id: number): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)));
+    if (isConfigured && db) {
+      try {
+        await deleteDoc(doc(db, 'products', String(id)));
+        return;
+      } catch(e) { console.error(e) }
+    }
+
+    const products = localStore.getProducts().filter(p => p.id !== id);
+    localStore.saveProducts(products);
   },
 
   // --- ORDERS ---
   getOrders: async (): Promise<Order[]> => {
-    if (!db) return [];
-    try {
-      await ensureAuth();
-      const q = query(collection(db, COLLECTIONS.ORDERS)); 
-      const querySnapshot = await getDocs(q);
-      const orders: Order[] = [];
-      querySnapshot.forEach((doc) => {
-        orders.push(doc.data() as Order);
-      });
-      // Manual sort
-      return orders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    } catch (error) {
-      console.error(error);
-      return [];
+    if (isConfigured && db) {
+       try {
+         const q = query(collection(db, 'orders'), orderBy('date', 'desc'));
+         const querySnapshot = await getDocs(q);
+         return querySnapshot.docs.map(doc => doc.data() as Order);
+       } catch (e) { console.error(e) }
     }
+    return localStore.getOrders();
   },
 
   saveOrder: async (order: Order): Promise<void> => {
-    if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    await setDoc(doc(db, COLLECTIONS.ORDERS, order.id), order);
+    if (isConfigured && db) {
+      try {
+        await setDoc(doc(db, 'orders', order.id), order);
+        return;
+      } catch (e) { console.error(e) }
+    }
+    
+    const orders = localStore.getOrders();
+    orders.unshift(order);
+    localStore.saveOrders(orders);
   },
 
   // --- CONFIG ---
   getConfig: async (): Promise<StoreConfig> => {
-    if (!db) return DEFAULT_CONFIG;
-    try {
-      const docSnap = await getDocs(collection(db, COLLECTIONS.CONFIG));
-      if (!docSnap.empty) {
-        return docSnap.docs[0].data() as StoreConfig;
-      }
-      return DEFAULT_CONFIG;
-    } catch (error) {
-      return DEFAULT_CONFIG;
+    if (isConfigured && db) {
+      try {
+        const docSnap = await getDocs(collection(db, 'config'));
+        if (!docSnap.empty) {
+          return docSnap.docs[0].data() as StoreConfig;
+        }
+      } catch (e) { console.error(e) }
     }
+    return localStore.getConfig();
   },
 
   saveConfig: async (config: StoreConfig): Promise<void> => {
-     if (!db) throw new Error("Banco de dados não conectado.");
-     await ensureAuth();
-     await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), config);
+     if (isConfigured && db) {
+       try {
+         // Sempre sobrescreve o doc 'main'
+         await setDoc(doc(db, 'config', 'main'), config);
+         return;
+       } catch (e) { console.error(e) }
+     }
+     localStore.saveConfig(config);
   }
 };
