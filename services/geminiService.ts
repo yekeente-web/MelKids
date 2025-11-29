@@ -1,17 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { PRODUCTS } from '../constants';
 
-const apiKey = process.env.API_KEY || '';
-
-// Initialize Gemini
-let ai: GoogleGenAI | null = null;
-if (apiKey) {
-  ai = new GoogleGenAI({ apiKey });
-}
+// Initialize Gemini directly using the environment variable as per guidelines.
+// The API key must be obtained exclusively from process.env.API_KEY.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getShoppingAdvice = async (userMessage: string): Promise<string> => {
-  if (!ai) return "Desculpe, a IA não está configurada corretamente (API Key ausente).";
-
   try {
     const productCatalog = PRODUCTS.map(p => `${p.name} (${p.category}) - ${p.soldOut ? '[ESGOTADO]' : ''} Kz ${p.price.toLocaleString('pt-AO')}`).join('\n');
     
