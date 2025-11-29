@@ -67,7 +67,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                         <h3 className="font-bold text-gray-800 text-sm leading-tight mb-1">{item.name}</h3>
-                        <p className="text-mel-blue font-bold text-sm">Kz {item.price.toLocaleString('pt-AO')}</p>
+                        <p className="text-mel-blue font-bold text-sm">{item.price.toLocaleString('pt-AO')} Kz</p>
                     </div>
                     
                     <div className="flex items-center justify-between">
@@ -101,11 +101,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="space-y-2 mb-6">
                 <div className="flex justify-between items-center text-gray-500 text-sm">
                     <span>Subtotal</span>
-                    <span>Kz {total.toLocaleString('pt-AO')}</span>
+                    <span>{total.toLocaleString('pt-AO')} Kz</span>
                 </div>
                 <div className="flex justify-between items-center text-xl font-extrabold text-gray-900">
                     <span>Total</span>
-                    <span>Kz {total.toLocaleString('pt-AO')}</span>
+                    <span>{total.toLocaleString('pt-AO')} Kz</span>
                 </div>
               </div>
               <button 

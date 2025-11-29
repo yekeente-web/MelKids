@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
 import { Product, CartItem, Category, StoreConfig } from './types';
@@ -22,6 +21,7 @@ const App: React.FC = () => {
     logoUrl: '',
     whatsappNumber: ''
   });
+  const [loadingData, setLoadingData] = useState(true);
 
   // UI State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -41,9 +41,23 @@ const App: React.FC = () => {
       return;
     }
 
-    // Load Data from Service (LocalStorage)
-    setProducts(dataService.getProducts());
-    setStoreConfig(dataService.getConfig());
+    const loadData = async () => {
+      setLoadingData(true);
+      try {
+        const [prods, conf] = await Promise.all([
+          dataService.getProducts(),
+          dataService.getConfig()
+        ]);
+        setProducts(prods);
+        setStoreConfig(conf);
+      } catch (error) {
+        console.error("Failed to load data", error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   // Filter Logic
@@ -106,7 +120,19 @@ const App: React.FC = () => {
     return <AdminDashboard />;
   }
 
-  // Else render Store
+  // Loading Screen
+  if (loadingData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#f8fafc]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-mel-blue border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-mel-blue font-bold animate-pulse">Carregando a lojinha...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Render Store
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-gray-800">
       {/* Header */}
@@ -363,6 +389,7 @@ const App: React.FC = () => {
         onClose={() => setIsCheckoutOpen(false)}
         cart={cart}
         clearCart={clearCart}
+        storeConfig={storeConfig}
       />
 
       <ProductDetails 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, Image, LogOut, CheckCircle, XCircle } from 'lucide-react';
 import { Product, Order, StoreConfig } from '../../types';
@@ -17,16 +16,29 @@ export const AdminDashboard: React.FC = () => {
       logoUrl: '',
       whatsappNumber: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   // Editing State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
 
+  const fetchData = async () => {
+    setIsLoading(true);
+    const [p, o, c] = await Promise.all([
+        dataService.getProducts(),
+        dataService.getOrders(),
+        dataService.getConfig()
+    ]);
+    setProducts(p);
+    setOrders(o);
+    setConfig(c);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
-    // Load Data
-    setProducts(dataService.getProducts());
-    setOrders(dataService.getOrders());
-    setConfig(dataService.getConfig());
-  }, [isAuthenticated]); // Reload when authed
+    if (isAuthenticated) {
+        fetchData();
+    }
+  }, [isAuthenticated]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,26 +49,25 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct && editingProduct.name) {
-      const updatedList = dataService.saveProduct(editingProduct as Product);
-      setProducts(updatedList);
+      await dataService.saveProduct(editingProduct as Product);
+      await fetchData(); // Refresh
       setEditingProduct(null);
     }
   };
 
-  const handleDeleteProduct = (id: number) => {
+  const handleDeleteProduct = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir este produto?')) {
-      const updatedList = dataService.deleteProduct(id);
-      setProducts(updatedList);
+      await dataService.deleteProduct(id);
+      await fetchData();
     }
   };
 
-  const handleSaveConfig = () => {
-    dataService.saveConfig(config);
+  const handleSaveConfig = async () => {
+    await dataService.saveConfig(config);
     alert('Configurações salvas!');
-    window.location.reload(); // Reload to apply changes globally
   };
 
   if (!isAuthenticated) {
@@ -93,9 +104,12 @@ export const AdminDashboard: React.FC = () => {
                  <div className="bg-mel-blue text-white p-2 rounded-lg font-bold">MK</div>
                  <h1 className="font-bold text-gray-800 text-lg hidden sm:block">Painel Administrativo</h1>
             </div>
-            <button onClick={() => window.location.href = '/'} className="text-sm text-gray-500 hover:text-mel-blue mr-4">
-                Ir para Loja
-            </button>
+            <div className="flex items-center gap-4">
+                {isLoading && <span className="text-xs text-mel-blue animate-pulse">Sincronizando...</span>}
+                <button onClick={() => window.location.href = '/'} className="text-sm text-gray-500 hover:text-mel-blue mr-4">
+                    Ir para Loja
+                </button>
+            </div>
         </div>
       </header>
 
@@ -230,7 +244,7 @@ export const AdminDashboard: React.FC = () => {
                                         <td className="py-3">
                                             <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">{p.category}</span>
                                         </td>
-                                        <td className="py-3 font-bold text-gray-600">Kz {p.price.toLocaleString('pt-AO')}</td>
+                                        <td className="py-3 font-bold text-gray-600">{p.price.toLocaleString('pt-AO')} Kz</td>
                                         <td className="py-3">
                                             {p.soldOut ? (
                                                 <span className="text-red-500 text-xs font-bold uppercase border border-red-200 bg-red-50 px-2 py-1 rounded">Esgotado</span>
@@ -268,7 +282,7 @@ export const AdminDashboard: React.FC = () => {
                                             <p className="text-sm text-gray-500">{order.customer.phone} • {order.customer.address}</p>
                                         </div>
                                         <div className="text-right">
-                                            <span className="block font-bold text-mel-blue">Kz {order.total.toLocaleString('pt-AO')}</span>
+                                            <span className="block font-bold text-mel-blue">{order.total.toLocaleString('pt-AO')} Kz</span>
                                             <span className="text-xs text-gray-400">{new Date(order.date).toLocaleDateString()}</span>
                                         </div>
                                     </div>
@@ -276,7 +290,7 @@ export const AdminDashboard: React.FC = () => {
                                         {order.items.map((item, idx) => (
                                             <div key={idx} className="flex justify-between text-gray-600">
                                                 <span>{item.quantity}x {item.name}</span>
-                                                <span>Kz {(item.price * item.quantity).toLocaleString('pt-AO')}</span>
+                                                <span>{(item.price * item.quantity).toLocaleString('pt-AO')} Kz</span>
                                             </div>
                                         ))}
                                     </div>
