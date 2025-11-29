@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
+import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle, FileInput } from 'lucide-react';
 import { Product, Order, StoreConfig } from '../../types';
 import { dataService } from '../../services/dataService';
 import { getConfigStatus } from '../../services/firebase';
@@ -31,19 +31,28 @@ export const AdminDashboard: React.FC = () => {
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  // Bulk Import State
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkJson, setBulkJson] = useState('');
+
   const fetchData = async () => {
     setIsLoading(true);
-    const [p, o, c, cats] = await Promise.all([
-        dataService.getProducts(),
-        dataService.getOrders(),
-        dataService.getConfig(),
-        dataService.getCategories()
-    ]);
-    setProducts(p);
-    setOrders(o);
-    setConfig(c);
-    setCategories(cats.filter(c => c !== 'Todos')); 
-    setIsLoading(false);
+    try {
+        const [p, o, c, cats] = await Promise.all([
+            dataService.getProducts(),
+            dataService.getOrders(),
+            dataService.getConfig(),
+            dataService.getCategories()
+        ]);
+        setProducts(p);
+        setOrders(o);
+        setConfig(c);
+        setCategories(cats.filter(c => c !== 'Todos')); 
+    } catch (e) {
+        console.error("Erro ao carregar dados:", e);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -115,6 +124,67 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleBulkImport = async () => {
+      try {
+          const parsed = JSON.parse(bulkJson);
+          if (!Array.isArray(parsed)) throw new Error("O JSON deve ser uma lista []");
+          
+          setIsLoading(true);
+          await dataService.importProductsBatch(parsed);
+          alert(`${parsed.length} produtos importados com sucesso!`);
+          setBulkJson('');
+          setIsBulkModalOpen(false);
+          await fetchData();
+      } catch (error: any) {
+          alert("Erro na importação: " + error.message);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  // ------------------------------------------------------------------
+  // CONFIG SETUP WIZARD (If keys missing)
+  // ------------------------------------------------------------------
+  if (isAuthenticated && !configStatus.isConfigured) {
+      return (
+          <div className="min-h-screen bg-gray-50 p-8 flex flex-col items-center">
+              <div className="bg-white max-w-2xl w-full p-8 rounded-3xl shadow-xl">
+                  <div className="flex items-center gap-3 mb-6 text-red-500">
+                      <AlertTriangle size={32} />
+                      <h1 className="text-2xl font-bold">Configuração Necessária</h1>
+                  </div>
+                  
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                      Para que o Painel Admin funcione e salve os dados de verdade, você precisa conectar o <b>Google Firebase</b>.
+                      Atualmente, as seguintes chaves não foram encontradas na Vercel:
+                  </p>
+
+                  <div className="bg-gray-100 p-4 rounded-xl mb-6 font-mono text-xs overflow-x-auto">
+                      {configStatus.envVars.map((v, i) => (
+                          <div key={i} className={`flex justify-between py-1 border-b border-gray-200 last:border-0 ${!v.val ? 'text-red-500 font-bold' : 'text-green-600'}`}>
+                              <span>{v.key}</span>
+                              <span>{v.val ? 'OK' : 'FALTANDO'}</span>
+                          </div>
+                      ))}
+                  </div>
+
+                  <h3 className="font-bold text-gray-800 mb-3">Como resolver:</h3>
+                  <ol className="list-decimal pl-5 space-y-2 text-sm text-gray-600 mb-8">
+                      <li>Acesse o <a href="https://console.firebase.google.com/" target="_blank" className="text-blue-600 hover:underline inline-flex items-center gap-1">Console do Firebase <ExternalLink size={12}/></a>.</li>
+                      <li>Crie um projeto novo chamado <b>MelKids</b>.</li>
+                      <li>Adicione um app Web (ícone <code>&lt;/&gt;</code>) para pegar as chaves.</li>
+                      <li>Ative o <b>Firestore Database</b> e o <b>Storage</b> no modo de teste.</li>
+                      <li>Vá no painel da Vercel &gt; Settings &gt; Environment Variables e adicione as chaves que estão faltando acima.</li>
+                  </ol>
+
+                  <button onClick={() => window.location.reload()} className="w-full bg-mel-blue text-white font-bold py-3 rounded-xl hover:bg-blue-800 transition">
+                      Já adicionei, recarregar página
+                  </button>
+              </div>
+          </div>
+      )
+  }
+
   // ------------------------------------------------------------------
   // LOGIN SCREEN
   // ------------------------------------------------------------------
@@ -138,13 +208,6 @@ export const AdminDashboard: React.FC = () => {
               Entrar
             </button>
           </form>
-          <div className="mt-6 text-center text-xs text-gray-500 flex items-center justify-center gap-1 bg-gray-50 p-2 rounded-lg">
-             {!configStatus.isConfigured ? (
-                 <span className="text-orange-500 flex items-center gap-1"><AlertTriangle size={12}/> Modo Local (Firebase Offline)</span>
-             ) : (
-                 <span className="text-green-600 flex items-center gap-1"><CheckCircle2 size={12}/> Sistema conectado ao Firebase</span>
-             )}
-          </div>
         </div>
       </div>
     );
@@ -161,11 +224,9 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center gap-3">
                  <div className="bg-mel-blue text-white p-2 rounded-lg font-bold">MK</div>
                  <h1 className="font-bold text-gray-800 text-lg hidden sm:block">Painel Administrativo</h1>
-                 {!configStatus.isConfigured && (
-                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full font-bold">
-                        Modo Local
-                    </span>
-                 )}
+                 <span className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full font-bold flex items-center gap-1">
+                    <CheckCircle2 size={12}/> Online
+                 </span>
             </div>
             <div className="flex items-center gap-4">
                 {isLoading && <span className="text-xs text-mel-blue animate-pulse">Sincronizando...</span>}
@@ -217,15 +278,60 @@ export const AdminDashboard: React.FC = () => {
             {/* PRODUCTS TAB */}
             {activeTab === 'products' && (
                 <div className="space-y-6">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h2 className="text-2xl font-bold text-gray-800">Gerenciar Produtos</h2>
-                        <button 
-                            onClick={() => setEditingProduct({ id: 0, name: '', price: 0, category: categories[0] || 'Roupas', description: '', image: '', isNew: true, soldOut: false })}
-                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"
-                        >
-                            <Plus size={20} /> Novo Produto
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setIsBulkModalOpen(true)}
+                                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                            >
+                                <FileInput size={20} /> Importar em Massa
+                            </button>
+                            <button 
+                                onClick={() => setEditingProduct({ id: 0, name: '', price: 0, category: categories[0] || 'Roupas', description: '', image: '', isNew: true, soldOut: false })}
+                                className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2"
+                            >
+                                <Plus size={20} /> Novo Produto
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Bulk Import Modal */}
+                    {isBulkModalOpen && (
+                        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col p-6">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl font-bold">Importação em Massa (JSON)</h3>
+                                    <button onClick={() => setIsBulkModalOpen(false)}><XCircle className="text-gray-400 hover:text-gray-600" /></button>
+                                </div>
+                                <p className="text-sm text-gray-500 mb-2">Cole aqui uma lista JSON de produtos. Exemplo:</p>
+                                <pre className="bg-gray-100 p-3 rounded-lg text-xs text-gray-600 mb-4 overflow-x-auto">
+{`[
+  {
+    "name": "Produto Exemplo",
+    "price": 5000,
+    "category": "Roupas",
+    "description": "Descrição do produto...",
+    "image": "https://link-da-imagem.com/foto.jpg"
+  },
+  { ... }
+]`}
+                                </pre>
+                                <textarea 
+                                    className="flex-1 p-4 border rounded-xl bg-gray-50 font-mono text-sm mb-4 h-64"
+                                    placeholder="Cole seu JSON aqui..."
+                                    value={bulkJson}
+                                    onChange={e => setBulkJson(e.target.value)}
+                                />
+                                <div className="flex justify-end gap-3">
+                                    <button onClick={() => setIsBulkModalOpen(false)} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
+                                    <button onClick={handleBulkImport} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700">
+                                        Importar Produtos
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Edit Modal / Form Overlay */}
                     {editingProduct && (
