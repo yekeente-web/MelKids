@@ -20,6 +20,17 @@ const DEFAULT_CONFIG: StoreConfig = {
   heroSubtitle: 'Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.'
 };
 
+const handleFirebaseError = (error: any) => {
+  console.error("Firebase Operation Error:", error);
+  if (error.code === 'permission-denied') {
+    throw new Error("PERMISSÃO NEGADA: Vá no Firebase Console > Firestore/Storage > Rules e mude para 'allow read, write: if true;' (ou configure autenticação).");
+  }
+  if (error.message && error.message.includes("Login Anônimo")) {
+    throw error; // Re-throw auth errors directly
+  }
+  throw new Error("Erro na operação: " + (error.message || "Erro desconhecido"));
+};
+
 export const dataService = {
   // --- UPLOAD ---
   uploadImage: async (file: File, folder: string = 'products'): Promise<string> => {
@@ -30,12 +41,15 @@ export const dataService = {
       throw new Error("A imagem é muito grande. O tamanho máximo é 5MB.");
     }
     
-    // Ensure auth before upload (fixes permission issues)
-    await ensureAuth();
-
-    const storageRef = ref(storage, `${folder}/${Date.now()}-${file.name}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
+    try {
+      await ensureAuth();
+      const storageRef = ref(storage, `${folder}/${Date.now()}-${file.name}`);
+      await uploadBytes(storageRef, file);
+      return await getDownloadURL(storageRef);
+    } catch (error) {
+      handleFirebaseError(error);
+      return "";
+    }
   },
 
   // --- CATEGORIES ---
@@ -56,9 +70,12 @@ export const dataService = {
 
   saveCategories: async (categories: string[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    // Saving as a single document for simplicity
-    await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: categories });
+    try {
+      await ensureAuth();
+      await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: categories });
+    } catch (error) {
+      handleFirebaseError(error);
+    }
   },
 
   // --- PRODUCTS ---
@@ -73,56 +90,69 @@ export const dataService = {
       return products;
     } catch (error) {
       console.error("Error fetching products:", error);
-      throw error;
+      // Don't throw here to avoid white screen, just return empty
+      return [];
     }
   },
 
   saveProduct: async (product: Product): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    // Ensure ID exists
-    const id = product.id === 0 ? Date.now() : product.id;
-    const finalProduct = { ...product, id };
-    
-    await setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
+    try {
+      await ensureAuth();
+      const id = product.id === 0 ? Date.now() : product.id;
+      const finalProduct = { ...product, id };
+      await setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
+    } catch (error) {
+      handleFirebaseError(error);
+    }
   },
 
   // Bulk Import
   importProductsBatch: async (products: Product[]): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    
-    const promises = products.map(product => {
-        const id = product.id || Date.now() + Math.floor(Math.random() * 1000);
-        const finalProduct = { ...product, id };
-        return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
-    });
-
-    await Promise.all(promises);
+    try {
+      await ensureAuth();
+      const promises = products.map(product => {
+          const id = product.id || Date.now() + Math.floor(Math.random() * 1000);
+          const finalProduct = { ...product, id };
+          return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)), finalProduct);
+      });
+      await Promise.all(promises);
+    } catch (error) {
+      handleFirebaseError(error);
+    }
   },
 
   // Seed Initial Data (Restaurar Padrão)
   seedInitialData: async (): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
+    try {
+      await ensureAuth();
 
-    // 1. Save Default Categories
-    await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: DEFAULT_CATEGORIES });
+      // 1. Save Default Categories
+      await setDoc(doc(db, COLLECTIONS.CATEGORIES, 'main'), { list: DEFAULT_CATEGORIES });
 
-    // 2. Save Default Config
-    await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), DEFAULT_CONFIG);
+      // 2. Save Default Config
+      await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), DEFAULT_CONFIG);
 
-    // 3. Save Default Products
-    const promises = PRODUCTS.map(product => {
-        return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(product.id)), product);
-    });
-    await Promise.all(promises);
+      // 3. Save Default Products
+      const promises = PRODUCTS.map(product => {
+          return setDoc(doc(db, COLLECTIONS.PRODUCTS, String(product.id)), product);
+      });
+      await Promise.all(promises);
+    } catch (error) {
+      handleFirebaseError(error);
+    }
   },
 
   deleteProduct: async (id: number): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)));
+    try {
+      await ensureAuth();
+      await deleteDoc(doc(db, COLLECTIONS.PRODUCTS, String(id)));
+    } catch (error) {
+      handleFirebaseError(error);
+    }
   },
 
   // --- ORDERS ---
@@ -136,7 +166,6 @@ export const dataService = {
       querySnapshot.forEach((doc) => {
         orders.push(doc.data() as Order);
       });
-      // Manual sort
       return orders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     } catch (error) {
       console.error(error);
@@ -146,8 +175,12 @@ export const dataService = {
 
   saveOrder: async (order: Order): Promise<void> => {
     if (!db) throw new Error("Banco de dados não conectado.");
-    await ensureAuth();
-    await setDoc(doc(db, COLLECTIONS.ORDERS, order.id), order);
+    try {
+      await ensureAuth();
+      await setDoc(doc(db, COLLECTIONS.ORDERS, order.id), order);
+    } catch (error) {
+      handleFirebaseError(error);
+    }
   },
 
   // --- CONFIG ---
@@ -166,7 +199,11 @@ export const dataService = {
 
   saveConfig: async (config: StoreConfig): Promise<void> => {
      if (!db) throw new Error("Banco de dados não conectado.");
-     await ensureAuth();
-     await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), config);
+     try {
+       await ensureAuth();
+       await setDoc(doc(db, COLLECTIONS.CONFIG, 'main'), config);
+     } catch (error) {
+       handleFirebaseError(error);
+     }
   }
 };

@@ -29,6 +29,7 @@ export const AdminDashboard: React.FC = () => {
   // Upload State
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Editing State
   const [editingProduct, setEditingProduct] = useState<Partial<Product> | null>(null);
@@ -76,9 +77,16 @@ export const AdminDashboard: React.FC = () => {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct && editingProduct.name) {
-      await dataService.saveProduct(editingProduct as Product);
-      await fetchData(); 
-      setEditingProduct(null);
+      setIsSavingProduct(true);
+      try {
+        await dataService.saveProduct(editingProduct as Product);
+        await fetchData(); 
+        setEditingProduct(null);
+      } catch (error: any) {
+        alert("Erro ao salvar: " + error.message);
+      } finally {
+        setIsSavingProduct(false);
+      }
     }
   };
 
@@ -96,8 +104,7 @@ export const AdminDashboard: React.FC = () => {
             const url = await dataService.uploadImage(file, 'products');
             setEditingProduct({ ...editingProduct, image: url });
         } catch (error: any) {
-            alert(error.message || 'Erro ao enviar imagem. Verifique se as chaves do Firebase estão corretas.');
-            console.error(error);
+            alert(error.message || 'Erro ao enviar imagem. Verifique se as chaves do Firebase estão corretas e se o Login Anônimo está ativo.');
         } finally {
             setIsUploading(false);
         }
@@ -126,30 +133,46 @@ export const AdminDashboard: React.FC = () => {
 
   const handleDeleteProduct = async (id: number) => {
     if (confirm('Tem certeza que deseja excluir este produto?')) {
-      await dataService.deleteProduct(id);
-      await fetchData();
+      try {
+        await dataService.deleteProduct(id);
+        await fetchData();
+      } catch (error: any) {
+        alert("Erro ao excluir: " + error.message);
+      }
     }
   };
 
   const handleSaveConfig = async () => {
-    await dataService.saveConfig(config);
-    alert('Configurações salvas!');
+    try {
+      await dataService.saveConfig(config);
+      alert('Configurações salvas!');
+    } catch (error: any) {
+      alert("Erro ao salvar configurações: " + error.message);
+    }
   };
 
   const handleAddCategory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;
-    const updated = [...categories, newCategoryName.trim()];
-    await dataService.saveCategories(updated);
-    setCategories(updated);
-    setNewCategoryName('');
+    try {
+      const updated = [...categories, newCategoryName.trim()];
+      await dataService.saveCategories(updated);
+      setCategories(updated);
+      setNewCategoryName('');
+    } catch (error: any) {
+      alert("Erro ao adicionar categoria: " + error.message);
+    }
   };
 
   const handleDeleteCategory = async (cat: string) => {
     if (confirm(`Remover categoria "${cat}"?`)) {
-        const updated = categories.filter(c => c !== cat);
-        await dataService.saveCategories(updated);
-        setCategories(updated);
+        try {
+          const updated = categories.filter(c => c !== cat);
+          await dataService.saveCategories(updated);
+          setCategories(updated);
+        } catch (error: any) {
+          alert("Erro ao remover: " + error.message);
+        }
     }
   };
 
@@ -404,8 +427,8 @@ export const AdminDashboard: React.FC = () => {
 
                                     <div className="flex justify-end gap-3 pt-4 border-t">
                                         <button type="button" onClick={() => setEditingProduct(null)} className="px-6 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg">Cancelar</button>
-                                        <button type="submit" disabled={isUploading} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                                            {isUploading ? 'Aguarde...' : 'Salvar Produto'}
+                                        <button type="submit" disabled={isUploading || isSavingProduct} className="px-6 py-2 bg-mel-blue text-white font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                                            {isSavingProduct ? 'Salvando...' : (isUploading ? 'Aguarde...' : 'Salvar Produto')}
                                         </button>
                                     </div>
                                 </form>

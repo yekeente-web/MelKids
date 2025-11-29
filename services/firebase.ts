@@ -36,12 +36,22 @@ if (hasKeys) {
 // Helper to ensure user is authenticated (anonymously) before operations
 // This fixes "Missing or insufficient permissions" errors on Storage/Firestore
 export const ensureAuth = async () => {
-  if (auth && !auth.currentUser) {
+  if (!auth) {
+    console.warn("Auth not initialized. Check keys.");
+    return;
+  }
+  
+  if (!auth.currentUser) {
     try {
+      console.log("Tentando login anônimo no Firebase...");
       await signInAnonymously(auth);
-      console.log("Authenticated anonymously for database access");
-    } catch (error) {
-      console.error("Auth error:", error);
+      console.log("Login anônimo realizado com sucesso. UID:", auth.currentUser?.uid);
+    } catch (error: any) {
+      console.error("Erro CRÍTICO no Login Anônimo:", error);
+      if (error.code === 'auth/admin-restricted-operation' || error.code === 'auth/operation-not-allowed') {
+        throw new Error("O Login Anônimo está DESATIVADO no Firebase Console. Vá em Authentication > Sign-in method e ative 'Anonymous'.");
+      }
+      throw error;
     }
   }
 };
