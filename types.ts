@@ -35,6 +35,8 @@ export interface StoreConfig {
   storeName: string;
   logoUrl: string;
   whatsappNumber: string;
+  heroTitle?: string;
+  heroSubtitle?: string;
 }
 
 export interface ChatMessage {
