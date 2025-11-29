@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
+import { ShoppingCart, Search, Menu, Filter, Smile } from 'lucide-react';
 import { Product, CartItem, Category } from './types';
 import { PRODUCTS, CATEGORIES } from './constants';
 import { ProductCard } from './components/ProductCard';
@@ -267,33 +267,21 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-sm leading-relaxed">
               Sua loja favorita de moda infantil em Angola. Trazendo cor, alegria e qualidade para o dia a dia das crianças.
             </p>
-            <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
-                📍 Luanda - Kilamba
-            </div>
           </div>
           <div>
             <h5 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Ajuda</h5>
             <ul className="space-y-3 text-sm text-gray-500">
-              <li><button className="hover:text-mel-blue transition text-left">Como Comprar</button></li>
-              <li><button className="hover:text-mel-blue transition text-left">Entregas em Luanda</button></li>
-              <li><button className="hover:text-mel-blue transition text-left">Trocas e Devoluções</button></li>
+              <li><a href="#" className="hover:text-mel-blue transition">Como Comprar</a></li>
+              <li><a href="#" className="hover:text-mel-blue transition">Entregas em Luanda</a></li>
+              <li><a href="#" className="hover:text-mel-blue transition">Trocas e Devoluções</a></li>
             </ul>
           </div>
           <div>
             <h5 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Contato</h5>
              <ul className="space-y-3 text-sm text-gray-500">
-              <li className="flex items-center gap-2">
-                <MessageCircle size={16} className="text-green-500" /> 
-                <a href="https://wa.me/244932853435" target="_blank" rel="noreferrer" className="hover:text-mel-blue transition font-bold text-gray-700">+244 932 853 435</a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Instagram size={16} className="text-pink-500" />
-                <a href="#" className="hover:text-mel-blue transition">@melkids.ao</a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail size={16} className="text-mel-blue" />
-                <a href="mailto:contato@melkids.ao" className="hover:text-mel-blue transition">contato@melkids.ao</a>
-              </li>
+              <li><a href="#" className="hover:text-mel-blue transition">WhatsApp: 9XX XXX XXX</a></li>
+              <li><a href="#" className="hover:text-mel-blue transition">Instagram: @melkids</a></li>
+              <li><a href="#" className="hover:text-mel-blue transition">Email: oi@melkids.ao</a></li>
             </ul>
           </div>
           <div>

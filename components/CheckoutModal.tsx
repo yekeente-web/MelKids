@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Smartphone, MapPin, User, FileText, MessageCircle } from 'lucide-react';
+import { X, CheckCircle, Smartphone, MapPin, User, FileText } from 'lucide-react';
 import { UserDetails, CartItem } from '../types';
 
 interface CheckoutModalProps {
@@ -10,6 +10,7 @@ interface CheckoutModalProps {
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cart, clearCart }) => {
+  const [step, setStep] = useState<'form' | 'success'>('form');
   const [formData, setFormData] = useState<UserDetails>({
     name: '',
     phone: '',
@@ -22,33 +23,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Format the message for WhatsApp
-    const itemsList = cart.map(item => 
-      `• ${item.name} (x${item.quantity}) - Kz ${(item.price * item.quantity).toLocaleString('pt-AO')}`
-    ).join('\n');
-
-    const message = `*Novo Pedido - MelKids* 🧸\n\n` +
-      `*Dados do Cliente:*\n` +
-      `👤 Nome: ${formData.name}\n` +
-      `📱 Telefone: ${formData.phone}\n` +
-      `📍 Endereço: ${formData.address}\n\n` +
-      `*Itens do Pedido:*\n${itemsList}\n\n` +
-      `*Total a Pagar: Kz ${total.toLocaleString('pt-AO')}*\n\n` +
-      `--------------------------------\n` +
-      `ℹ️ _Pagamento por transferência._\n` +
-      `_Envio o comprovativo em seguida!_ 👇`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappNumber = "244932853435"; // Format: CountryCode + Number
-    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
-
-    // Open WhatsApp
-    window.open(whatsappUrl, '_blank');
-    
-    // Clear cart and close
-    clearCart();
-    onClose();
+    // Simulate API call
+    setTimeout(() => {
+      setStep('success');
+      clearCart();
+    }, 1000);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -59,11 +38,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-fade-in-up max-h-[90vh] overflow-y-auto">
         
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        {step === 'form' ? (
+          <form onSubmit={handleSubmit} className="flex flex-col h-full">
             <div className="bg-white p-6 border-b flex justify-between items-center sticky top-0 z-10">
               <div>
                 <h2 className="text-xl font-bold text-gray-800">Finalizar Pedido</h2>
-                <p className="text-xs text-gray-500">Enviar pedido via WhatsApp</p>
+                <p className="text-xs text-gray-500">Preencha seus dados para entrega</p>
               </div>
               <button type="button" onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
                 <X size={20} />
@@ -121,10 +101,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
               <div className="bg-mel-blue/5 border border-mel-blue/10 p-5 rounded-2xl">
                 <h3 className="font-bold text-mel-blue flex items-center gap-2 mb-3">
                     <FileText size={18} />
-                    Pagamento
+                    Pagamento por Transferência
                 </h3>
                 <p className="text-sm text-gray-600 mb-3 leading-relaxed">
-                    Ao confirmar, você será redirecionado para o WhatsApp. Envie o comprovativo de transferência para o IBAN abaixo:
+                    Faça a transferência do valor total para o IBAN abaixo e aguarde nosso contato para envio do comprovativo.
                 </p>
                 <div className="bg-white p-3 rounded-xl border border-dashed border-mel-blue/30 text-center">
                     <p className="text-xs text-gray-400 uppercase">IBAN (BAI)</p>
@@ -137,13 +117,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
             <div className="p-6 border-t border-gray-100 bg-gray-50 mt-auto">
               <button 
                 type="submit"
-                className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-500/20 transform transition active:scale-[0.98] text-lg flex items-center justify-center gap-2"
+                className="w-full bg-mel-green hover:bg-green-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-500/20 transform transition active:scale-[0.98] text-lg flex items-center justify-center gap-2"
               >
-                <MessageCircle size={24} />
-                Confirmar no WhatsApp
+                Confirmar Pedido
               </button>
             </div>
           </form>
+        ) : (
+          <div className="p-10 flex flex-col items-center text-center">
+            <div className="w-24 h-24 bg-green-100 text-green-500 rounded-full flex items-center justify-center mb-6 animate-bounce">
+              <CheckCircle size={48} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">Pedido Realizado!</h2>
+            <p className="text-gray-500 mb-8 max-w-xs mx-auto leading-relaxed">
+              Obrigado, <strong>{formData.name}</strong>! Entraremos em contato pelo telefone <strong>{formData.phone}</strong> para confirmar o pagamento e a entrega.
+            </p>
+            <button 
+              onClick={onClose}
+              className="bg-mel-blue text-white font-bold py-3 px-10 rounded-full hover:bg-blue-700 transition shadow-lg"
+            >
+              Voltar para Loja
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
