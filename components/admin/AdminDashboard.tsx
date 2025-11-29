@@ -1,12 +1,17 @@
+
 import React, { useState, useEffect } from 'react';
-import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, Image, LogOut, CheckCircle, XCircle, List, UploadCloud } from 'lucide-react';
+import { Package, ShoppingBag, Settings, Plus, Edit2, Trash2, Save, LogOut, List, UploadCloud, AlertTriangle, ExternalLink, CheckCircle2, XCircle } from 'lucide-react';
 import { Product, Order, StoreConfig } from '../../types';
 import { dataService } from '../../services/dataService';
+import { getConfigStatus } from '../../services/firebase';
 
 export const AdminDashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'settings' | 'categories'>('products');
+  
+  // Config Status
+  const configStatus = getConfigStatus();
   
   // Data State
   const [products, setProducts] = useState<Product[]>([]);
@@ -37,7 +42,7 @@ export const AdminDashboard: React.FC = () => {
     setProducts(p);
     setOrders(o);
     setConfig(c);
-    setCategories(cats.filter(c => c !== 'Todos')); // Hide 'Todos' from management as it's default
+    setCategories(cats.filter(c => c !== 'Todos')); 
     setIsLoading(false);
   };
 
@@ -60,7 +65,7 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     if (editingProduct && editingProduct.name) {
       await dataService.saveProduct(editingProduct as Product);
-      await fetchData(); // Refresh
+      await fetchData(); 
       setEditingProduct(null);
     }
   };
@@ -72,8 +77,8 @@ export const AdminDashboard: React.FC = () => {
         try {
             const url = await dataService.uploadImage(file);
             setEditingProduct({ ...editingProduct, image: url });
-        } catch (error) {
-            alert('Erro ao enviar imagem. Verifique se o Firebase Storage está ativado.');
+        } catch (error: any) {
+            alert(error.message || 'Erro ao enviar imagem.');
             console.error(error);
         } finally {
             setIsUploading(false);
@@ -93,7 +98,8 @@ export const AdminDashboard: React.FC = () => {
     alert('Configurações salvas!');
   };
 
-  const handleAddCategory = async () => {
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!newCategoryName.trim()) return;
     const updated = [...categories, newCategoryName.trim()];
     await dataService.saveCategories(updated);
@@ -109,6 +115,9 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // ------------------------------------------------------------------
+  // LOGIN SCREEN
+  // ------------------------------------------------------------------
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -129,11 +138,21 @@ export const AdminDashboard: React.FC = () => {
               Entrar
             </button>
           </form>
+          <div className="mt-6 text-center text-xs text-gray-500 flex items-center justify-center gap-1 bg-gray-50 p-2 rounded-lg">
+             {!configStatus.isConfigured ? (
+                 <span className="text-orange-500 flex items-center gap-1"><AlertTriangle size={12}/> Modo Local (Firebase Offline)</span>
+             ) : (
+                 <span className="text-green-600 flex items-center gap-1"><CheckCircle2 size={12}/> Sistema conectado ao Firebase</span>
+             )}
+          </div>
         </div>
       </div>
     );
   }
 
+  // ------------------------------------------------------------------
+  // DASHBOARD MAIN
+  // ------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top Bar */}
@@ -142,6 +161,11 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center gap-3">
                  <div className="bg-mel-blue text-white p-2 rounded-lg font-bold">MK</div>
                  <h1 className="font-bold text-gray-800 text-lg hidden sm:block">Painel Administrativo</h1>
+                 {!configStatus.isConfigured && (
+                    <span className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full font-bold">
+                        Modo Local
+                    </span>
+                 )}
             </div>
             <div className="flex items-center gap-4">
                 {isLoading && <span className="text-xs text-mel-blue animate-pulse">Sincronizando...</span>}
@@ -358,7 +382,7 @@ export const AdminDashboard: React.FC = () => {
                 <div className="space-y-6 max-w-xl">
                     <h2 className="text-2xl font-bold text-gray-800">Gerenciar Categorias</h2>
                     
-                    <div className="flex gap-2">
+                    <form onSubmit={handleAddCategory} className="flex gap-2">
                         <input 
                             value={newCategoryName}
                             onChange={e => setNewCategoryName(e.target.value)}
@@ -366,13 +390,13 @@ export const AdminDashboard: React.FC = () => {
                             className="flex-1 p-3 border rounded-xl"
                         />
                         <button 
-                            onClick={handleAddCategory}
+                            type="submit"
                             disabled={!newCategoryName.trim()}
                             className="bg-mel-blue text-white px-6 rounded-xl font-bold hover:bg-blue-800 disabled:opacity-50"
                         >
                             Adicionar
                         </button>
-                    </div>
+                    </form>
 
                     <div className="space-y-2">
                         {categories.map(cat => (
