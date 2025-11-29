@@ -7,12 +7,12 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getShoppingAdvice = async (userMessage: string): Promise<string> => {
   try {
-    const productCatalog = PRODUCTS.map(p => `${p.name} (${p.category}) - ${p.soldOut ? '[ESGOTADO]' : ''} ${p.price.toLocaleString('pt-AO')} Kz`).join('\n');
+    const productCatalog = PRODUCTS.map(p => `${p.name} (${p.category}) - ${p.soldOut ? '[ESGOTADO]' : ''} Kz ${p.price.toLocaleString('pt-AO')}`).join('\n');
     
     const systemInstruction = `Você é o assistente virtual amigável da loja MelKids em Angola. 
     Seu objetivo é ajudar pais e tios a escolherem presentes ou roupas para crianças.
     Seja breve, divertido e use emojis.
-    Os preços estão em Kwanzas (Kz), formato "8 500 Kz".
+    Os preços estão em Kwanzas (Kz).
     
     Aqui está o nosso catálogo atual:
     ${productCatalog}

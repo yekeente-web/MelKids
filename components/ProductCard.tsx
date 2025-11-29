@@ -57,7 +57,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
           <div>
             <span className="text-xs text-gray-400 block mb-0.5">Preço</span>
             <span className="text-xl font-extrabold text-gray-900">
-              {product.price.toLocaleString('pt-AO')} Kz
+              Kz {product.price.toLocaleString('pt-AO')}
             </span>
           </div>
           

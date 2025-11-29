@@ -59,7 +59,7 @@ export const ProductDetails: React.FC<ProductDetailsProps> = ({ product, onClose
           
           <div className="flex items-baseline gap-4 mb-6">
             <span className="text-3xl font-extrabold text-mel-green">
-              {product.price.toLocaleString('pt-AO')} Kz
+              Kz {product.price.toLocaleString('pt-AO')}
             </span>
             {product.isNew && (
                 <span className="text-sm font-bold text-mel-pink animate-pulse">

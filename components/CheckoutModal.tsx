@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
 import { X, Smartphone, MapPin, User, FileText, MessageCircle } from 'lucide-react';
-import { UserDetails, CartItem, StoreConfig } from '../types';
-import { dataService } from '../services/dataService';
+import { UserDetails, CartItem } from '../types';
 
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   cart: CartItem[];
   clearCart: () => void;
-  storeConfig: StoreConfig;
 }
 
-export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cart, clearCart, storeConfig }) => {
+export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, cart, clearCart }) => {
   const [formData, setFormData] = useState<UserDetails>({
     name: '',
     phone: '',
@@ -22,45 +20,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
 
   const total = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Save Order to Admin History
-    const orderId = `#${Math.floor(Math.random() * 10000)}`;
-    
-    await dataService.saveOrder({
-      id: orderId,
-      date: new Date().toISOString(),
-      customer: formData,
-      items: cart,
-      total: total,
-      status: 'pending'
-    });
-
-    // 2. Format the message for WhatsApp
+    // Format the message for WhatsApp
     const itemsList = cart.map(item => 
-      `• ${item.name} (x${item.quantity}) - ${(item.price * item.quantity).toLocaleString('pt-AO')} Kz`
+      `• ${item.name} (x${item.quantity}) - Kz ${(item.price * item.quantity).toLocaleString('pt-AO')}`
     ).join('\n');
 
-    const message = `*Novo Pedido - ${storeConfig.storeName}* 🧸\n` +
-      `*Pedido:* ${orderId}\n\n` +
+    const message = `*Novo Pedido - MelKids* 🧸\n\n` +
       `*Dados do Cliente:*\n` +
       `👤 Nome: ${formData.name}\n` +
       `📱 Telefone: ${formData.phone}\n` +
       `📍 Endereço: ${formData.address}\n\n` +
       `*Itens do Pedido:*\n${itemsList}\n\n` +
-      `*Total a Pagar: ${total.toLocaleString('pt-AO')} Kz*\n\n` +
+      `*Total a Pagar: Kz ${total.toLocaleString('pt-AO')}*\n\n` +
       `--------------------------------\n` +
       `ℹ️ _Pagamento por transferência._\n` +
       `_Envio o comprovativo em seguida!_ 👇`;
 
     const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${storeConfig.whatsappNumber}?text=${encodedMessage}`;
+    const whatsappNumber = "244932853435"; // Format: CountryCode + Number
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
 
-    // 3. Open WhatsApp
+    // Open WhatsApp
     window.open(whatsappUrl, '_blank');
     
-    // 4. Clear cart and close
+    // Clear cart and close
     clearCart();
     onClose();
   };
@@ -88,7 +74,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose, c
               {/* Order Summary */}
               <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex justify-between items-center">
                 <span className="text-gray-600 text-sm font-medium">{cart.length} itens no carrinho</span>
-                <span className="font-bold text-mel-blue text-lg">{total.toLocaleString('pt-AO')} Kz</span>
+                <span className="font-bold text-mel-blue text-lg">Kz {total.toLocaleString('pt-AO')}</span>
               </div>
 
               {/* Personal Info */}
