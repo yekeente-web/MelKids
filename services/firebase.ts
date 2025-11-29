@@ -2,43 +2,35 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getAnalytics } from "firebase/analytics";
 
+// Configuração fornecida pelo usuário
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: process.env.FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID
+  apiKey: "AIzaSyBuocEfXJsrdYkg7wfvrC-vUu5X9VNo6mI",
+  authDomain: "melkids-2ff33.firebaseapp.com",
+  projectId: "melkids-2ff33",
+  storageBucket: "melkids-2ff33.firebasestorage.app",
+  messagingSenderId: "394463672064",
+  appId: "1:394463672064:web:1fe1032c9ddf60dead65e5",
+  measurementId: "G-LHEG5MWL3J"
 };
 
-// Check if critical keys exist
-const hasKeys = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
+// Inicializa o Firebase
+const app = initializeApp(firebaseConfig);
 
-export const app = hasKeys ? initializeApp(firebaseConfig) : null;
-export const db = app ? getFirestore(app) : null;
-export const storage = app ? getStorage(app) : null;
+// Exporta os serviços para serem usados no resto do site
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null;
 
-export const isConfigured = hasKeys;
+// Informa ao sistema que está tudo configurado
+export const isConfigured = true;
 
+// Função auxiliar para o AdminDashboard não bloquear o acesso
 export const getConfigStatus = () => {
-  const missingKeys: string[] = [];
-  const envVars = [
-    { key: 'FIREBASE_API_KEY', val: firebaseConfig.apiKey },
-    { key: 'FIREBASE_AUTH_DOMAIN', val: firebaseConfig.authDomain },
-    { key: 'FIREBASE_PROJECT_ID', val: firebaseConfig.projectId },
-    { key: 'FIREBASE_STORAGE_BUCKET', val: firebaseConfig.storageBucket },
-    { key: 'FIREBASE_MESSAGING_SENDER_ID', val: firebaseConfig.messagingSenderId },
-    { key: 'FIREBASE_APP_ID', val: firebaseConfig.appId },
-  ];
-
-  envVars.forEach(v => {
-    if (!v.val) missingKeys.push(v.key);
-  });
-
   return {
-    isConfigured: missingKeys.length === 0,
-    missingKeys,
-    envVars
+    isConfigured: true,
+    missingKeys: [],
+    envVars: []
   };
 };
