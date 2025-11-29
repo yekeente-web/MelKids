@@ -1,26 +1,54 @@
+
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Search, Menu, Filter, Smile } from 'lucide-react';
-import { Product, CartItem, Category } from './types';
-import { PRODUCTS, CATEGORIES } from './constants';
+import { ShoppingCart, Search, Menu, Filter, Smile, Instagram, MessageCircle, Mail } from 'lucide-react';
+import { Product, CartItem, Category, StoreConfig } from './types';
+import { CATEGORIES } from './constants';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetails } from './components/ProductDetails';
 import { CartDrawer } from './components/CartDrawer';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AssistantChat } from './components/AssistantChat';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { dataService } from './services/dataService';
 
 const App: React.FC = () => {
+  // Routing Check
+  const [isAdminRoute, setIsAdminRoute] = useState(false);
+
+  // App Data State
+  const [products, setProducts] = useState<Product[]>([]);
+  const [storeConfig, setStoreConfig] = useState<StoreConfig>({
+    storeName: 'MelKids',
+    logoUrl: '',
+    whatsappNumber: ''
+  });
+
+  // UI State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>(PRODUCTS);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Initialization
+  useEffect(() => {
+    // Check Route
+    if (window.location.pathname === '/ad') {
+      setIsAdminRoute(true);
+      return;
+    }
+
+    // Load Data from Service (LocalStorage)
+    setProducts(dataService.getProducts());
+    setStoreConfig(dataService.getConfig());
+  }, []);
 
   // Filter Logic
   useEffect(() => {
-    let result = PRODUCTS;
+    let result = products;
 
     if (selectedCategory !== 'Todos') {
       result = result.filter(p => p.category === selectedCategory);
@@ -35,7 +63,7 @@ const App: React.FC = () => {
     }
 
     setFilteredProducts(result);
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, products]);
 
   // Cart Logic
   const addToCart = (product: Product) => {
@@ -73,6 +101,12 @@ const App: React.FC = () => {
 
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
+  // If Admin Route, render Dashboard
+  if (isAdminRoute) {
+    return <AdminDashboard />;
+  }
+
+  // Else render Store
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col font-sans text-gray-800">
       {/* Header */}
@@ -94,8 +128,8 @@ const App: React.FC = () => {
               onClick={() => {setSelectedCategory('Todos'); window.scrollTo({top:0, behavior: 'smooth'})}}
             >
                <img 
-                 src="https://upload.wikimedia.org/wikipedia/commons/e/e4/Melkids_Logo.png" 
-                 alt="MelKids"
+                 src={storeConfig.logoUrl || "https://upload.wikimedia.org/wikipedia/commons/e/e4/Melkids_Logo.png"} 
+                 alt={storeConfig.storeName}
                  className="h-10 md:h-12 object-contain"
                  onError={(e) => {
                    const target = e.target as HTMLImageElement;
@@ -176,8 +210,8 @@ const App: React.FC = () => {
                 Nova Coleção 2024 🚀
               </span>
               <h1 className="text-5xl md:text-6xl font-black leading-[1.1] text-mel-blue">
-                Estilo & Diversão <br/>
-                <span className="text-mel-pink">Em Cada Peça</span>
+                {storeConfig.storeName}<br/>
+                <span className="text-mel-pink">Angola</span>
               </h1>
               <p className="text-lg text-gray-600 max-w-lg leading-relaxed">
                 Descubra roupas, calçados e acessórios que acompanham o ritmo das crianças. Tudo em Kwanzas com entrega rápida.
@@ -263,25 +297,37 @@ const App: React.FC = () => {
       <footer className="bg-white border-t border-gray-100 pt-16 pb-8">
         <div className="container mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="space-y-4">
-            <h4 className="text-2xl font-extrabold text-mel-blue">MelKids<span className="text-mel-orange">.</span></h4>
+            <h4 className="text-2xl font-extrabold text-mel-blue">{storeConfig.storeName}<span className="text-mel-orange">.</span></h4>
             <p className="text-gray-500 text-sm leading-relaxed">
               Sua loja favorita de moda infantil em Angola. Trazendo cor, alegria e qualidade para o dia a dia das crianças.
             </p>
+            <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
+                📍 Luanda - Kilamba
+            </div>
           </div>
           <div>
             <h5 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Ajuda</h5>
             <ul className="space-y-3 text-sm text-gray-500">
-              <li><a href="#" className="hover:text-mel-blue transition">Como Comprar</a></li>
-              <li><a href="#" className="hover:text-mel-blue transition">Entregas em Luanda</a></li>
-              <li><a href="#" className="hover:text-mel-blue transition">Trocas e Devoluções</a></li>
+              <li><button className="hover:text-mel-blue transition text-left">Como Comprar</button></li>
+              <li><button className="hover:text-mel-blue transition text-left">Entregas em Luanda</button></li>
+              <li><button className="hover:text-mel-blue transition text-left">Trocas e Devoluções</button></li>
             </ul>
           </div>
           <div>
             <h5 className="font-bold text-gray-800 mb-4 text-sm uppercase tracking-wider">Contato</h5>
              <ul className="space-y-3 text-sm text-gray-500">
-              <li><a href="#" className="hover:text-mel-blue transition">WhatsApp: 9XX XXX XXX</a></li>
-              <li><a href="#" className="hover:text-mel-blue transition">Instagram: @melkids</a></li>
-              <li><a href="#" className="hover:text-mel-blue transition">Email: oi@melkids.ao</a></li>
+              <li className="flex items-center gap-2">
+                <MessageCircle size={16} className="text-green-500" /> 
+                <a href={`https://wa.me/${storeConfig.whatsappNumber}`} target="_blank" rel="noreferrer" className="hover:text-mel-blue transition font-bold text-gray-700">WhatsApp Oficial</a>
+              </li>
+              <li className="flex items-center gap-2">
+                <Instagram size={16} className="text-pink-500" />
+                <a href="#" className="hover:text-mel-blue transition">@melkids.ao</a>
+              </li>
+              <li className="flex items-center gap-2">
+                <Mail size={16} className="text-mel-blue" />
+                <a href="mailto:contato@melkids.ao" className="hover:text-mel-blue transition">contato@melkids.ao</a>
+              </li>
             </ul>
           </div>
           <div>
@@ -294,7 +340,7 @@ const App: React.FC = () => {
         </div>
         <div className="border-t border-gray-100 pt-8 text-center">
           <p className="text-xs text-gray-400">
-            &copy; 2024 MelKids Angola. Todos os direitos reservados.
+            &copy; 2024 {storeConfig.storeName} Angola. Todos os direitos reservados.
           </p>
         </div>
       </footer>
